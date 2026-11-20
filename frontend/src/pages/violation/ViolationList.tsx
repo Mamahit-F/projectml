@@ -11,6 +11,8 @@ export const ViolationList: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
 
+  const [error, setError] = useState<string | null>(null);
+
   // Manual Adjustment Modal
   const [isAdjustOpen, setIsAdjustOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<number>(1);
@@ -21,18 +23,20 @@ export const ViolationList: React.FC = () => {
 
   const fetchData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [vRes, rRes, sRes] = await Promise.all([
         violationService.getAll({ page, size: 20 }),
         violationService.getRules().catch(() => []),
         studentService.getAll({ size: 50 }).then((r) => r.content).catch(() => []),
       ]);
-      setViolations(vRes.content);
+      setViolations(vRes.content || []);
       setRules(rRes);
       setStudents(sRes);
       if (sRes.length > 0) setSelectedStudentId(sRes[0].id);
     } catch (err) {
       console.error(err);
+      setError('Gagal memuat riwayat poin pelanggaran dari server.');
     } finally {
       setLoading(false);
     }
@@ -85,9 +89,9 @@ export const ViolationList: React.FC = () => {
       <div className="p-4 bg-slate-100 rounded-xl border border-slate-200 text-slate-700 text-xs flex items-start gap-3">
         <Sliders className="w-5 h-5 shrink-0 text-slate-500 mt-0.5" />
         <div>
-          <span className="font-semibold text-slate-900">Konfigurasi Bobot Poin [DEMO / UNVERIFIED]:</span>
+          <span className="font-semibold text-slate-900">Konfigurasi Bobot Poin Pelanggaran:</span>
           <p className="mt-0.5 text-slate-600">
-            Sesuai ketentuan Fase 3 FR-09, bobot poin awal ini bersifat dinamis dan dapat diubah. Nilai poin resmi akan disesuaikan dengan surat keputusan resmi Village Dean Universitas Klabat.
+            Bobot poin dihitung otomatis untuk ketidakhadiran ibadah wajib sesuai aturan kategori tempat tinggal dan dapat disesuaikan oleh Administrator dengan pencatatan audit log.
           </p>
         </div>
       </div>
@@ -96,6 +100,8 @@ export const ViolationList: React.FC = () => {
       <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
         {loading ? (
           <LoadingState />
+        ) : error ? (
+          <div className="p-6 text-center text-xs text-red-600">{error}</div>
         ) : violations.length === 0 ? (
           <EmptyState message="Belum ada riwayat poin pelanggaran tercatat." />
         ) : (
@@ -103,46 +109,61 @@ export const ViolationList: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="py-3 px-4 font-semibold">Tanggal</th>
-                  <th className="py-3 px-4 font-semibold">Mahasiswa</th>
-                  <th className="py-3 px-4 font-semibold">Kegiatan Terkait</th>
-                  <th className="py-3 px-4 font-semibold">Alasan / Jenis Pelanggaran</th>
-                  <th className="py-3 px-4 font-semibold text-center">Poin</th>
-                  <th className="py-3 px-4 font-semibold text-right">Tipe Entri</th>
+                  <th className="py-3 px-3 font-semibold">Tanggal</th>
+                  <th className="py-3 px-3 font-semibold">Mahasiswa</th>
+                  <th className="py-3 px-3 font-semibold">Kegiatan Terkait</th>
+                  <th className="py-3 px-3 font-semibold">Alasan / Status</th>
+                  <th className="py-3 px-3 font-semibold text-center">Poin</th>
+                  <th className="py-3 px-3 font-semibold text-right">Tipe Entri</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {violations.map((v) => (
+                {violations.map((v: any) => {
+                  const cancelled = v.status === 'CANCELLED';
+                  const isManual = v.isManualAdjustment || !!v.adjustedBy || !v.worshipEventTitle;
+                  return (
                   <tr key={v.id} className="hover:bg-slate-50/70 transition">
-                    <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
+                    <td className="py-3 px-3 text-slate-500 whitespace-nowrap">
                       {new Date(v.createdAt).toLocaleDateString('id-ID')}
                     </td>
-                    <td className="py-3.5 px-4">
+                    <td className="py-3 px-3">
                       <p className="font-semibold text-slate-900">{v.studentName}</p>
                       <p className="text-[10px] text-slate-400 font-mono">{v.studentNim}</p>
                     </td>
-                    <td className="py-3.5 px-4 text-slate-600">
+                    <td className="py-3 px-3 text-slate-600">
                       {v.worshipEventTitle || 'Penyesuaian Manual Admin'}
                     </td>
-                    <td className="py-3.5 px-4 text-slate-700">{v.reason}</td>
-                    <td className="py-3.5 px-4 text-center">
+                    <td className="py-3 px-3 text-slate-700">
+                      <span className={cancelled ? 'line-through text-slate-400' : ''}>{v.reason}</span>
+                      {cancelled && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-600">
+                          CANCELLED
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
                       <span className={`px-2.5 py-1 rounded-full font-bold text-xs ${
-                        v.points > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+                        cancelled
+                          ? 'bg-slate-100 text-slate-400 line-through'
+                          : v.points > 0
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-emerald-100 text-emerald-700'
                       }`}>
                         {v.points > 0 ? `+${v.points}` : v.points} Poin
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="py-3 px-3 text-right whitespace-nowrap">
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
-                        v.isManualAdjustment
+                        isManual
                           ? 'bg-purple-100 text-purple-700 border border-purple-200'
                           : 'bg-slate-100 text-slate-600'
                       }`}>
-                        {v.isManualAdjustment ? 'Manual / Koreksi' : 'Otomatis Presensi'}
+                        {isManual ? 'Manual / Koreksi' : 'Otomatis Presensi'}
                       </span>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

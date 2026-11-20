@@ -65,4 +65,10 @@ public class WorshipEventController {
     public ResponseEntity<ApiResponse<WorshipEventDTO>> updateStatus(@PathVariable Long id, @RequestParam EventStatus status) {
         return ResponseEntity.ok(ApiResponse.ok("Event status updated", eventService.updateStatus(id, status)));
     }
+
+    @PatchMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    public ResponseEntity<ApiResponse<WorshipEventDTO>> cancel(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok("Event cancelled", eventService.updateStatus(id, EventStatus.CANCELLED)));
+    }
 }

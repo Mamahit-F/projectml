@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { QrCode, CheckCircle, AlertCircle, Calendar, UserCheck, Shield, Camera } from 'lucide-react';
-import { attendanceService, eventService } from '../../services';
-import type { WorshipEvent, Attendance } from '../../types';
+import { attendanceService, eventService, studentService } from '../../services';
+import type { WorshipEvent, Attendance, Student } from '../../types';
 import { Button, Input, Select, Badge, LoadingState } from '../../components/ui';
 
 export const QRScanner: React.FC = () => {
   const [events, setEvents] = useState<WorshipEvent[]>([]);
+  const [sampleStudents, setSampleStudents] = useState<Student[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [qrToken, setQrToken] = useState('');
   const [loading, setLoading] = useState(false);
@@ -14,13 +15,17 @@ export const QRScanner: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    eventService.getAll({ size: 10 }).then((res) => {
-      const activeEvents = res.content.filter((e) => e.status !== 'CANCELLED');
-      setEvents(activeEvents);
-      if (activeEvents.length > 0) {
-        setSelectedEventId(activeEvents[0].id);
+    eventService.getAll({ size: 20 }).then((res) => {
+      const activeEvents = res.content.filter((e) => e.status === 'ONGOING' || e.status === 'SCHEDULED');
+      const sorted = [...activeEvents].sort((a, b) => (a.status === 'ONGOING' ? -1 : b.status === 'ONGOING' ? 1 : 0));
+      setEvents(sorted);
+      if (sorted.length > 0) {
+        setSelectedEventId(sorted[0].id);
       }
     });
+    studentService.getAll({ size: 4, status: 'ACTIVE' }).then((res) => {
+      setSampleStudents(res.content || []);
+    }).catch(() => {});
   }, []);
 
   const handleScanSubmit = async (e: React.FormEvent) => {
@@ -111,41 +116,25 @@ export const QRScanner: React.FC = () => {
         </form>
 
         {/* Quick Simulator Buttons for Testing */}
-        <div className="mt-4 pt-4 border-t border-slate-100">
-          <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-2 font-semibold">
-            Simulasi Cepat Token Demo:
-          </p>
-          <div className="flex flex-wrap justify-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setQrToken('QR-STU-105022110001')}
-              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-[10px] font-mono text-slate-600"
-            >
-              Kevin (10001)
-            </button>
-            <button
-              type="button"
-              onClick={() => setQrToken('QR-STU-105022110002')}
-              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-[10px] font-mono text-slate-600"
-            >
-              Grace (10002)
-            </button>
-            <button
-              type="button"
-              onClick={() => setQrToken('QR-STU-105012010015')}
-              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-[10px] font-mono text-slate-600"
-            >
-              Michael (10015)
-            </button>
-            <button
-              type="button"
-              onClick={() => setQrToken('QR-STU-105032210044')}
-              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-[10px] font-mono text-slate-600"
-            >
-              Sarah (10044)
-            </button>
+        {sampleStudents.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-2 font-semibold">
+              Simulasi Cepat Token Mahasiswa Aktif:
+            </p>
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {sampleStudents.map((stu) => (
+                <button
+                  key={stu.id}
+                  type="button"
+                  onClick={() => setQrToken(stu.qrToken)}
+                  className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-[10px] font-mono text-slate-600"
+                >
+                  {stu.fullName.split(' ')[0]} ({stu.nim.slice(-5)})
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Last Scanned Feedback Card */}
@@ -156,7 +145,9 @@ export const QRScanner: React.FC = () => {
             <div>
               <p className="text-xs font-semibold text-emerald-800">Presensi Berhasil Dicatat!</p>
               <p className="text-sm font-bold text-emerald-950 mt-0.5">{lastScanned.studentName}</p>
-              <p className="text-[11px] text-emerald-700 font-mono">NIM: {lastScanned.studentNim} • {lastScanned.residenceCategoryName}</p>
+              <p className="text-[11px] text-emerald-700 font-mono">
+                NIM: {lastScanned.studentNim} • {(lastScanned as any).studentResidenceName || lastScanned.residenceCategoryName}
+              </p>
             </div>
           </div>
           <span className="px-3 py-1 bg-emerald-200 text-emerald-900 font-bold text-xs rounded-full">
@@ -172,14 +163,16 @@ export const QRScanner: React.FC = () => {
             Riwayat Pemindaian Sesi Ini ({scanHistory.length} Mahasiswa)
           </h3>
           <div className="divide-y divide-slate-100">
-            {scanHistory.map((s, idx) => (
+            {scanHistory.map((s: any, idx) => (
               <div key={idx} className="py-2.5 flex items-center justify-between text-xs">
                 <div>
                   <p className="font-semibold text-slate-800">{s.studentName}</p>
-                  <p className="text-[10px] text-slate-400 font-mono">{s.studentNim} • {s.scannedAt || 'Baru saja'}</p>
+                  <p className="text-[10px] text-slate-400 font-mono">
+                    {s.studentNim} • {s.checkInTime ? new Date(s.checkInTime).toLocaleTimeString('id-ID') : s.scannedAt || 'Baru saja'}
+                  </p>
                 </div>
                 <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
-                  {s.method}
+                  {s.recordedMethod || s.method}
                 </span>
               </div>
             ))}

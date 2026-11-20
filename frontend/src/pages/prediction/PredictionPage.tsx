@@ -74,7 +74,7 @@ export const PredictionPage: React.FC = () => {
         <div>
           <p className="font-semibold">Prinsip Sistem Pendukung Keputusan (Decision Support Only):</p>
           <p className="mt-0.5 text-blue-800 leading-relaxed">
-            Sesuai Fase 1.3 & Fase 6.J prompt, hasil prediksi Machine Learning <strong>tidak boleh dijadikan dasar pemberian hukuman otomatis</strong>. Klasifikasi risiko berfungsi semata-mata sebagai indikator preventif bagi Village Dean untuk memberikan bimbingan dan pembinaan pastoral secara proaktif.
+            Hasil prediksi Machine Learning <strong>tidak dijadikan dasar pemberian hukuman otomatis</strong>. Klasifikasi risiko berfungsi semata-mata sebagai indikator preventif bagi Village Dean untuk memberikan bimbingan dan pembinaan pastoral secara proaktif.
           </p>
         </div>
       </div>
@@ -84,24 +84,24 @@ export const PredictionPage: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <StatCard
             title="Total Mahasiswa Dianalisis"
-            value={summary.totalStudents}
+            value={(summary as any).totalPredicted ?? summary.totalStudents ?? 0}
             icon={<BrainCircuit className="w-5 h-5 text-indigo-600" />}
           />
           <StatCard
             title="Risiko Tinggi (HIGH)"
-            value={summary.highRisk}
+            value={(summary as any).highRiskCount ?? summary.highRisk ?? 0}
             icon={<AlertTriangle className="w-5 h-5 text-red-600" />}
             subtitle="Prioritas pembinaan Village Dean"
           />
           <StatCard
             title="Risiko Sedang (MEDIUM)"
-            value={summary.mediumRisk}
+            value={(summary as any).mediumRiskCount ?? summary.mediumRisk ?? 0}
             icon={<Info className="w-5 h-5 text-amber-600" />}
             subtitle="Pemantauan presensi berkala"
           />
           <StatCard
             title="Risiko Rendah (LOW)"
-            value={summary.lowRisk}
+            value={(summary as any).lowRiskCount ?? summary.lowRisk ?? 0}
             icon={<CheckCircle className="w-5 h-5 text-emerald-600" />}
             subtitle="Tingkat kedisiplinan baik"
           />
@@ -160,8 +160,8 @@ export const PredictionPage: React.FC = () => {
                   <th className="py-3 px-4 font-semibold">Mahasiswa</th>
                   <th className="py-3 px-4 font-semibold">Kategori</th>
                   <th className="py-3 px-4 font-semibold text-center">Tingkat Risiko</th>
-                  <th className="py-3 px-4 font-semibold text-center">Tingkat Kehadiran</th>
-                  <th className="py-3 px-4 font-semibold text-center">Absen Beruntun</th>
+                  <th className="py-3 px-4 font-semibold text-center">Probabilitas Risiko</th>
+                  <th className="py-3 px-4 font-semibold text-center">Versi Model</th>
                   <th className="py-3 px-4 font-semibold text-center">Poin Pelanggaran</th>
                   <th className="py-3 px-4 font-semibold">Catatan Evaluasi Sistem</th>
                 </tr>

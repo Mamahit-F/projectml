@@ -12,10 +12,11 @@ export const StudentForm: React.FC = () => {
 
   const [nim, setNim] = useState('');
   const [fullName, setFullName] = useState('');
-  const [programStudy, setProgramStudy] = useState('');
+  const [studyProgram, setStudyProgram] = useState('');
+  const [faculty, setFaculty] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [residenceCategoryId, setResidenceCategoryId] = useState<number>(1);
-  const [residenceAddress, setResidenceAddress] = useState('');
+  const [currentAddress, setCurrentAddress] = useState('');
   const [status, setStatus] = useState('ACTIVE');
 
   // Emergency Contact Form Fields
@@ -37,13 +38,14 @@ export const StudentForm: React.FC = () => {
 
     if (isEdit) {
       setLoading(true);
-      studentService.getById(Number(id)).then((s) => {
+      studentService.getById(Number(id)).then((s: any) => {
         setNim(s.nim);
         setFullName(s.fullName);
-        setProgramStudy(s.programStudy);
+        setStudyProgram(s.studyProgram || s.programStudy || '');
+        setFaculty(s.faculty || '');
         setPhoneNumber(s.phoneNumber || '');
-        setResidenceCategoryId(s.residenceCategoryId);
-        setResidenceAddress(s.residenceAddress || '');
+        setResidenceCategoryId(s.residenceCategory?.id || s.residenceCategoryId || 1);
+        setCurrentAddress(s.currentAddress || s.residenceAddress || '');
         setStatus(s.status);
 
         if (s.emergencyContacts && s.emergencyContacts.length > 0) {
@@ -64,16 +66,15 @@ export const StudentForm: React.FC = () => {
     const payload: any = {
       nim,
       fullName,
-      programStudy,
+      studyProgram,
+      faculty,
       phoneNumber,
       residenceCategoryId: Number(residenceCategoryId),
-      residenceAddress,
+      currentAddress,
       status,
-      emergencyContacts: contactName ? [{
-        contactName,
-        relationship,
-        phoneNumber: contactPhone,
-      }] : [],
+      emergencyContactName: contactName || undefined,
+      emergencyRelationship: contactName ? relationship : undefined,
+      emergencyPhone: contactName ? contactPhone : undefined,
     };
 
     try {
@@ -84,7 +85,12 @@ export const StudentForm: React.FC = () => {
       }
       navigate('/students');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Gagal menyimpan data mahasiswa.');
+      const validationMap = err.response?.data?.data;
+      if (validationMap && typeof validationMap === 'object') {
+        setError(Object.values(validationMap).join(', '));
+      } else {
+        setError(err.response?.data?.message || 'Gagal menyimpan data mahasiswa.');
+      }
     } finally {
       setLoading(false);
     }
@@ -130,13 +136,20 @@ export const StudentForm: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Input
               label="Program Studi"
               required
               placeholder="Contoh: Informatika / Sistem Informasi"
-              value={programStudy}
-              onChange={(e) => setProgramStudy(e.target.value)}
+              value={studyProgram}
+              onChange={(e) => setStudyProgram(e.target.value)}
+            />
+            <Input
+              label="Fakultas"
+              required
+              placeholder="Contoh: Fakultas Ilmu Komputer"
+              value={faculty}
+              onChange={(e) => setFaculty(e.target.value)}
             />
             <Input
               label="Nomor WhatsApp / HP Mahasiswa"
@@ -171,10 +184,11 @@ export const StudentForm: React.FC = () => {
 
           <Textarea
             label="Alamat Lengkap Tempat Tinggal (Kos / Rumah)"
+            required
             rows={2}
             placeholder="Alamat detail kos, nomor kamar, nama pemilik kos..."
-            value={residenceAddress}
-            onChange={(e) => setResidenceAddress(e.target.value)}
+            value={currentAddress}
+            onChange={(e) => setCurrentAddress(e.target.value)}
           />
 
           {/* Section: Emergency Contact */}

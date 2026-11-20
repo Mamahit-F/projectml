@@ -123,31 +123,34 @@ export const StudentList: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="py-3 px-4 font-semibold">NIM</th>
-                  <th className="py-3 px-4 font-semibold">Nama Mahasiswa</th>
-                  <th className="py-3 px-4 font-semibold">Program Studi</th>
-                  <th className="py-3 px-4 font-semibold">Kategori</th>
-                  <th className="py-3 px-4 font-semibold text-center">Poin Pelanggaran</th>
-                  <th className="py-3 px-4 font-semibold">Status</th>
-                  <th className="py-3 px-4 font-semibold text-right">Aksi</th>
+                  <th className="py-3 px-3 font-semibold">NIM</th>
+                  <th className="py-3 px-3 font-semibold">Nama Mahasiswa</th>
+                  <th className="py-3 px-3 font-semibold">Program Studi</th>
+                  <th className="py-3 px-3 font-semibold">Kategori</th>
+                  <th className="py-3 px-3 font-semibold text-center">Poin</th>
+                  <th className="py-3 px-3 font-semibold">Status</th>
+                  <th className="py-3 px-3 font-semibold text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {students.map((student) => (
+                {students.map((student: any) => {
+                  const categoryName = student.residenceCategory?.name || student.residenceCategoryName || 'Outsider';
+                  const studyProgram = student.studyProgram || student.programStudy || '-';
+                  return (
                   <tr key={student.id} className="hover:bg-slate-50/70 transition">
-                    <td className="py-3.5 px-4 font-mono font-medium text-slate-900">{student.nim}</td>
-                    <td className="py-3.5 px-4 font-medium text-slate-800">{student.fullName}</td>
-                    <td className="py-3.5 px-4 text-slate-500">{student.programStudy}</td>
-                    <td className="py-3.5 px-4">
+                    <td className="py-3 px-3 font-mono font-medium text-slate-900 whitespace-nowrap">{student.nim}</td>
+                    <td className="py-3 px-3 font-medium text-slate-800">{student.fullName}</td>
+                    <td className="py-3 px-3 text-slate-500">{studyProgram}</td>
+                    <td className="py-3 px-3 whitespace-nowrap">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                        student.residenceCategoryName?.includes('Dekat')
+                        categoryName.includes('Dekat')
                           ? 'bg-blue-50 text-blue-700 border border-blue-200'
                           : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                       }`}>
-                        {student.residenceCategoryName || 'Outsider'}
+                        {categoryName}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-center">
+                    <td className="py-3 px-3 text-center">
                       <span className={`px-2 py-0.5 rounded font-bold text-xs ${
                         student.totalViolationPoints > 20
                           ? 'bg-red-100 text-red-700'
@@ -158,12 +161,12 @@ export const StudentList: React.FC = () => {
                         {student.totalViolationPoints}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4">
+                    <td className="py-3 px-3">
                       <Badge color={student.status === 'ACTIVE' ? 'green' : 'gray'}>
                         {student.status}
                       </Badge>
                     </td>
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="py-3 px-3 text-right whitespace-nowrap">
                       <Link to={`/students/${student.id}`}>
                         <Button size="sm" variant="secondary" icon={<Eye className="w-3.5 h-3.5" />}>
                           Detail
@@ -171,7 +174,8 @@ export const StudentList: React.FC = () => {
                       </Link>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

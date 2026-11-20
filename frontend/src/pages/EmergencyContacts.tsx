@@ -63,8 +63,11 @@ export const EmergencyContacts: React.FC = () => {
         <EmptyState message="Tidak ada data mahasiswa ditemukan." />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {students.map((s) => {
+          {students.map((s: any) => {
             const contact = s.emergencyContacts && s.emergencyContacts.length > 0 ? s.emergencyContacts[0] : null;
+            const categoryName = s.residenceCategory?.name || s.residenceCategoryName || 'Outsider';
+            const studyProgram = s.studyProgram || s.programStudy || '';
+            const address = s.currentAddress || s.residenceAddress;
             return (
               <div key={s.id} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex flex-col justify-between">
                 <div>
@@ -73,16 +76,16 @@ export const EmergencyContacts: React.FC = () => {
                       {s.nim}
                     </span>
                     <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
-                      {s.residenceCategoryName}
+                      {categoryName}
                     </span>
                   </div>
                   <h3 className="text-sm font-bold text-slate-900">{s.fullName}</h3>
-                  <p className="text-xs text-slate-500">{s.programStudy}</p>
+                  <p className="text-xs text-slate-500">{studyProgram}</p>
 
                   <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs">
                     <div className="flex items-start gap-2 text-slate-600">
                       <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                      <span className="truncate">{s.residenceAddress || 'Alamat kos belum dicatat'}</span>
+                      <span className="truncate">{address || 'Alamat kos belum dicatat'}</span>
                     </div>
                     {s.phoneNumber && (
                       <div className="flex items-center gap-2 text-slate-600 font-mono">

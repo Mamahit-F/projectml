@@ -142,7 +142,14 @@ export const App: React.FC = () => {
             />
 
             {/* Settings */}
-            <Route path="settings" element={<Settings />} />
+            <Route
+              path="settings"
+              element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'VILLAGE_DEAN']}>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

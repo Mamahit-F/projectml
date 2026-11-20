@@ -29,6 +29,7 @@ const navItems: NavItem[] = [
   { to: '/residence-categories', label: 'Kategori Tempat Tinggal', icon: <MapPin className="w-5 h-5" />, roles: ['ADMIN'] },
   { to: '/attendance-rules', label: 'Aturan Presensi', icon: <Settings className="w-5 h-5" />, roles: ['ADMIN'] },
   { to: '/users', label: 'Kelola Pengguna', icon: <UserCog className="w-5 h-5" />, roles: ['ADMIN'] },
+  { to: '/settings', label: 'Pengaturan Sistem', icon: <Settings className="w-5 h-5" />, roles: ['ADMIN', 'VILLAGE_DEAN'] },
 ];
 
 export const Sidebar: React.FC = () => {
@@ -61,6 +62,7 @@ export const Sidebar: React.FC = () => {
           <NavLink
             key={item.to}
             to={item.to}
+            end={item.to === '/attendance'}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
                 isActive

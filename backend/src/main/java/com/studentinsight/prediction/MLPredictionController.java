@@ -18,16 +18,19 @@ public class MLPredictionController {
     private final MLPredictionService predictionService;
 
     @GetMapping("/summary")
+    @PreAuthorize("hasAnyRole('ADMIN', 'VILLAGE_DEAN')")
     public ResponseEntity<ApiResponse<PredictionSummaryDTO>> getSummary() {
         return ResponseEntity.ok(ApiResponse.ok("Prediction risk summary retrieved", predictionService.getSummary()));
     }
 
     @GetMapping("/latest")
+    @PreAuthorize("hasAnyRole('ADMIN', 'VILLAGE_DEAN')")
     public ResponseEntity<ApiResponse<List<StudentPredictionDTO>>> getAllLatest() {
         return ResponseEntity.ok(ApiResponse.ok("Latest predictions for all students retrieved", predictionService.getAllLatestPredictions()));
     }
 
     @GetMapping("/student/{studentId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'VILLAGE_DEAN')")
     public ResponseEntity<ApiResponse<StudentPredictionDTO>> getLatestByStudent(@PathVariable Long studentId) {
         return predictionService.getLatestPrediction(studentId)
                 .map(pred -> ResponseEntity.ok(ApiResponse.ok("Latest prediction retrieved", pred)))

@@ -38,6 +38,22 @@ public class DashboardOverviewDTO {
     // ML Predictions stats
     private PredictionSummaryDTO predictionSummary;
 
+    // Welfare stats
+    private long openWelfareReports;
+
+    // Attendance trend by event date
+    private List<AttendanceTrendItem> attendanceTrend;
+
     // Attention needed list (high points or high risk)
     private List<StudentDTO> studentsNeedingEvaluation;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AttendanceTrendItem {
+        private String date;
+        private long present;
+        private long absent;
+    }
 }

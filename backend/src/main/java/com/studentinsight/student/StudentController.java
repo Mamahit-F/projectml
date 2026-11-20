@@ -1,6 +1,7 @@
 package com.studentinsight.student;
 
 import com.studentinsight.common.ApiResponse;
+import com.studentinsight.common.QrCodeGenerator;
 import com.studentinsight.student.dto.CreateStudentRequest;
 import com.studentinsight.student.dto.StudentDTO;
 import com.studentinsight.student.dto.UpdateStudentRequest;
@@ -15,6 +16,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/students")
@@ -82,5 +84,28 @@ public class StudentController {
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
     public ResponseEntity<ApiResponse<StudentDTO>> refreshQrToken(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok("QR token regenerated", studentService.refreshQrToken(id)));
+    }
+
+    @PostMapping("/{id}/regenerate-qr")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    public ResponseEntity<ApiResponse<StudentDTO>> regenerateQrToken(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok("QR token regenerated", studentService.refreshQrToken(id)));
+    }
+
+    @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deactivateStudent(@PathVariable Long id) {
+        studentService.archiveStudent(id);
+        return ResponseEntity.ok(ApiResponse.ok("Student successfully archived", null));
+    }
+
+    @GetMapping("/{id}/qr-code")
+    public ResponseEntity<ApiResponse<Map<String, String>>> getQrCode(@PathVariable Long id) {
+        StudentDTO student = studentService.getStudentById(id);
+        String qrBase64 = QrCodeGenerator.toPngDataUrl(student.getQrToken(), 8);
+        return ResponseEntity.ok(ApiResponse.ok("QR code generated", Map.of(
+                "qrToken", student.getQrToken(),
+                "qrCodeBase64", qrBase64
+        )));
     }
 }

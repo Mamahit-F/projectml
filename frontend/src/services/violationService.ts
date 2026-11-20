@@ -11,7 +11,12 @@ export const violationService = {
     return res.data.data;
   },
   adjust: async (studentId: number, data: { points: number; reason: string; notes?: string }): Promise<void> => {
-    await api.post(`/violation-points/adjust/${studentId}`, data);
+    await api.post('/violation-points/manual-adjustment', {
+      studentId,
+      points: data.points,
+      reason: data.reason,
+      adjustmentNotes: data.notes?.trim() || data.reason,
+    });
   },
   getByStudent: async (studentId: number): Promise<ViolationPoint[]> => {
     const res = await api.get<ApiResponse<ViolationPoint[]>>(`/violation-points/student/${studentId}`);

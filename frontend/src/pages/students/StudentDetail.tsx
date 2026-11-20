@@ -89,11 +89,14 @@ export const StudentDetail: React.FC = () => {
                 <h1 className="text-xl font-bold text-slate-900">{student.fullName}</h1>
                 <Badge color={student.status === 'ACTIVE' ? 'green' : 'gray'}>{student.status}</Badge>
               </div>
-              <p className="text-xs text-slate-500 font-mono mt-0.5">NIM: {student.nim} • {student.programStudy}</p>
-              <div className="flex items-center gap-3 mt-2 text-xs text-slate-600">
+              <p className="text-xs text-slate-500 font-mono mt-0.5">
+                NIM: {student.nim} • {(student as any).studyProgram || student.programStudy}{(student as any).faculty ? ` (${(student as any).faculty})` : ''}
+              </p>
+              <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-slate-600">
                 <span className="flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                  {student.residenceCategoryName}
+                  {(student as any).residenceCategory?.name || student.residenceCategoryName}
+                  {((student as any).currentAddress || student.residenceAddress) ? ` — ${(student as any).currentAddress || student.residenceAddress}` : ''}
                 </span>
                 {student.phoneNumber && (
                   <span className="flex items-center gap-1">
@@ -155,7 +158,7 @@ export const StudentDetail: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {attendances.map((a) => (
+                  {attendances.map((a: any) => (
                     <tr key={a.id} className="hover:bg-slate-50/70">
                       <td className="py-2.5 font-medium text-slate-800">{a.worshipEventTitle}</td>
                       <td className="py-2.5">
@@ -165,7 +168,7 @@ export const StudentDetail: React.FC = () => {
                           {a.status}
                         </span>
                       </td>
-                      <td className="py-2.5 text-right font-mono text-slate-500">{a.method}</td>
+                      <td className="py-2.5 text-right font-mono text-slate-500">{a.recordedMethod || a.method || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -184,19 +187,27 @@ export const StudentDetail: React.FC = () => {
             <p className="text-xs text-slate-400 py-4">Tidak ada catatan pelanggaran untuk mahasiswa ini.</p>
           ) : (
             <div className="space-y-2.5">
-              {violations.map((v) => (
-                <div key={v.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-start justify-between text-xs">
+              {violations.map((v: any) => {
+                const cancelled = v.status === 'CANCELLED';
+                return (
+                <div key={v.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-start justify-between text-xs gap-2">
                   <div>
-                    <p className="font-semibold text-slate-800">{v.reason}</p>
+                    <p className={`font-semibold ${cancelled ? 'line-through text-slate-400' : 'text-slate-800'}`}>{v.reason}</p>
                     <p className="text-[10px] text-slate-400 mt-0.5">
                       {new Date(v.createdAt).toLocaleDateString('id-ID')}
+                      {cancelled ? ' • Dibatalkan' : ''}
                     </p>
                   </div>
-                  <span className="font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded">
+                  <span className={`font-bold px-2 py-0.5 rounded whitespace-nowrap ${
+                    cancelled
+                      ? 'text-slate-500 bg-slate-200 border border-slate-300 line-through'
+                      : 'text-red-600 bg-red-50 border border-red-200'
+                  }`}>
                     +{v.points} Poin
                   </span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -58,4 +58,10 @@ public class AuthController {
         UserDTO user = userService.getUserByUsername(authentication.getName());
         return ResponseEntity.ok(ApiResponse.ok("Current user profile retrieved", user));
     }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout() {
+        SecurityContextHolder.clearContext();
+        return ResponseEntity.ok(ApiResponse.ok("Logout successful", null));
+    }
 }

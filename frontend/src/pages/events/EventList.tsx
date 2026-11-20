@@ -64,27 +64,27 @@ export const EventList: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="py-3 px-4 font-semibold">Nama Kegiatan</th>
-                  <th className="py-3 px-4 font-semibold">Jenis Ibadah</th>
-                  <th className="py-3 px-4 font-semibold">Tanggal & Waktu</th>
-                  <th className="py-3 px-4 font-semibold">Lokasi</th>
-                  <th className="py-3 px-4 font-semibold text-center">Status</th>
-                  <th className="py-3 px-4 font-semibold text-right">Aksi</th>
+                  <th className="py-3 px-3 font-semibold">Nama Kegiatan</th>
+                  <th className="py-3 px-3 font-semibold">Jenis Ibadah</th>
+                  <th className="py-3 px-3 font-semibold">Tanggal & Waktu</th>
+                  <th className="py-3 px-3 font-semibold">Lokasi</th>
+                  <th className="py-3 px-3 font-semibold text-center">Status</th>
+                  <th className="py-3 px-3 font-semibold text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {events.map((event) => (
                   <tr key={event.id} className="hover:bg-slate-50/70 transition">
-                    <td className="py-3.5 px-4 font-medium text-slate-900">{event.title}</td>
-                    <td className="py-3.5 px-4 font-mono text-slate-600">{event.eventType}</td>
-                    <td className="py-3.5 px-4 text-slate-600">
+                    <td className="py-3 px-3 font-medium text-slate-900">{event.title}</td>
+                    <td className="py-3 px-3 font-mono text-slate-600 whitespace-nowrap">{event.eventType}</td>
+                    <td className="py-3 px-3 text-slate-600 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
                         <span>{event.eventDate} ({event.startTime})</span>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 text-slate-500">{event.location || 'GKST / Pioneer Chapel'}</td>
-                    <td className="py-3.5 px-4 text-center">
+                    <td className="py-3 px-3 text-slate-500">{event.location || 'GKST / Pioneer Chapel'}</td>
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
                       <Badge color={
                         event.status === 'COMPLETED' ? 'green' :
                         event.status === 'CANCELLED' ? 'red' :
@@ -93,7 +93,7 @@ export const EventList: React.FC = () => {
                         {event.status}
                       </Badge>
                     </td>
-                    <td className="py-3.5 px-4 text-right space-x-2">
+                    <td className="py-3 px-3 text-right whitespace-nowrap space-x-1">
                       <Link to={`/attendance?eventId=${event.id}`}>
                         <Button size="sm" variant="secondary">Presensi</Button>
                       </Link>

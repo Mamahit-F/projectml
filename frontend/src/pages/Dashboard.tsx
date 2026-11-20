@@ -40,6 +40,23 @@ export const Dashboard: React.FC = () => {
   if (loading) return <LoadingState />;
   if (!data) return <div className="p-8 text-center text-slate-500">Gagal memuat ringkasan dashboard.</div>;
 
+  const d: any = data;
+  const outsiderDekat = d.outsiderDekatCount ?? d.totalOutsiderDekat ?? 0;
+  const outsiderJauh = d.outsiderJauhCount ?? d.totalOutsiderJauh ?? 0;
+  const totalEvents = d.totalWorshipEvents ?? d.totalEventsThisMonth ?? 0;
+  const highRiskCount = d.predictionSummary?.highRiskCount ?? d.highRiskStudents ?? 0;
+  const openWelfare = d.openWelfareReports ?? 0;
+
+  const riskChartData = d.riskDistribution || (d.predictionSummary
+    ? [
+        { level: 'LOW', count: d.predictionSummary.lowRiskCount || 0 },
+        { level: 'MEDIUM', count: d.predictionSummary.mediumRiskCount || 0 },
+        { level: 'HIGH', count: d.predictionSummary.highRiskCount || 0 },
+      ].filter((item) => item.count > 0)
+    : []);
+
+  const violatorsList: any[] = d.topViolators || d.studentsNeedingEvaluation || [];
+
   return (
     <div className="space-y-6">
       {/* Top Banner / Title */}
@@ -65,25 +82,25 @@ export const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Mahasiswa Outsider"
-          value={data.totalStudents}
+          value={d.totalStudents ?? 0}
           icon={<Users className="w-6 h-6 text-emerald-600" />}
-          subtitle={`Dekat: ${data.totalOutsiderDekat} | Jauh: ${data.totalOutsiderJauh}`}
+          subtitle={`Dekat: ${outsiderDekat} | Jauh: ${outsiderJauh}`}
         />
         <StatCard
-          title="Kegiatan Ibadah Aktif"
-          value={data.totalEventsThisMonth}
+          title="Kegiatan Ibadah"
+          value={totalEvents}
           icon={<Calendar className="w-6 h-6 text-blue-600" />}
-          subtitle="Jadwal ibadah terjadwal"
+          subtitle={`Berjalan: ${d.ongoingEvents ?? 0} | Selesai: ${d.completedEvents ?? 0}`}
         />
         <StatCard
           title="Mahasiswa Berisiko Tinggi (ML)"
-          value={data.highRiskStudents}
+          value={highRiskCount}
           icon={<BrainCircuit className="w-6 h-6 text-red-600" />}
-          subtitle="Rekomendasi evaluasi pembina"
+          subtitle={`Sedang: ${d.predictionSummary?.mediumRiskCount ?? 0} | Rendah: ${d.predictionSummary?.lowRiskCount ?? 0}`}
         />
         <StatCard
           title="Laporan Bantuan / Kasus"
-          value={data.openWelfareReports}
+          value={openWelfare}
           icon={<HeartHandshake className="w-6 h-6 text-amber-600" />}
           subtitle="Perlu tindak lanjut Village Dean"
         />
@@ -101,7 +118,7 @@ export const Dashboard: React.FC = () => {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={data.riskDistribution || []}
+                  data={riskChartData}
                   dataKey="count"
                   nameKey="level"
                   cx="50%"
@@ -109,7 +126,7 @@ export const Dashboard: React.FC = () => {
                   outerRadius={80}
                   label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
                 >
-                  {(data.riskDistribution || []).map((entry, index) => (
+                  {riskChartData.map((entry: any, index: number) => (
                     <Cell key={`cell-${index}`} fill={RISK_COLORS[entry.level] || '#64748b'} />
                   ))}
                 </Pie>
@@ -128,10 +145,10 @@ export const Dashboard: React.FC = () => {
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.attendanceTrend || []}>
+              <BarChart data={d.attendanceTrend || []}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
                 <Tooltip />
                 <Legend />
                 <Bar dataKey="present" name="Hadir" fill="#10b981" radius={[4, 4, 0, 0]} />
@@ -159,21 +176,24 @@ export const Dashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {data.topViolators && data.topViolators.length > 0 ? (
-                data.topViolators.map((v, idx) => (
+              {violatorsList.length > 0 ? (
+                violatorsList.map((v, idx) => {
+                  const pts = v.totalViolationPoints ?? v.points ?? 0;
+                  return (
                   <tr key={idx} className="hover:bg-slate-50/80 transition">
-                    <td className="py-3 font-medium text-slate-800">{v.studentName}</td>
+                    <td className="py-3 font-medium text-slate-800">{v.fullName || v.studentName}</td>
                     <td className="py-3 text-slate-500">{v.nim}</td>
-                    <td className="py-3 text-right font-bold text-red-600">{v.points} Poin</td>
+                    <td className="py-3 text-right font-bold text-red-600">{pts} Poin</td>
                     <td className="py-3 text-right">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                        v.points >= 20 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                        pts >= 20 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
                       }`}>
-                        {v.points >= 20 ? 'Perlu Panggilan Binaan' : 'Pantauan Khusus'}
+                        {pts >= 20 ? 'Perlu Panggilan Binaan' : 'Pantauan Khusus'}
                       </span>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={4} className="py-6 text-center text-slate-400">

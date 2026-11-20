@@ -13,6 +13,8 @@ import com.studentinsight.violation.dto.ManualPointAdjustmentRequest;
 import com.studentinsight.violation.dto.ViolationPointDTO;
 import com.studentinsight.violation.dto.ViolationPointRuleDTO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,14 @@ public class ViolationPointService {
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
+
+    @Transactional(readOnly = true)
+    public Page<ViolationPointDTO> getAllViolations(Long studentId, Pageable pageable) {
+        Page<ViolationPoint> page = (studentId != null)
+                ? violationPointRepository.findByStudentIdOrderByCreatedAtDesc(studentId, pageable)
+                : violationPointRepository.findAllByOrderByCreatedAtDesc(pageable);
+        return page.map(ViolationPointDTO::fromEntity);
+    }
 
     @Transactional(readOnly = true)
     public List<ViolationPointDTO> getStudentViolations(Long studentId) {

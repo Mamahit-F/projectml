@@ -12,11 +12,10 @@ export const FollowUpList: React.FC = () => {
   // Modal
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<number>(1);
-  const [followUpType, setFollowUpType] = useState('PASTORAL_COUNSELING');
-  const [followUpDate, setFollowUpDate] = useState(new Date().toISOString().split('T')[0]);
-  const [notes, setNotes] = useState('');
-  const [outcome, setOutcome] = useState('');
-  const [nextActionRequired, setNextActionRequired] = useState(false);
+  const [counselingDate, setCounselingDate] = useState(new Date().toISOString().split('T')[0]);
+  const [topicsDiscussed, setTopicsDiscussed] = useState('');
+  const [actionPlan, setActionPlan] = useState('');
+  const [followUpStatus, setFollowUpStatus] = useState('SCHEDULED');
   const [saving, setSaving] = useState(false);
 
   const fetchData = async () => {
@@ -26,7 +25,7 @@ export const FollowUpList: React.FC = () => {
         followUpService.getAll({ size: 20 }),
         studentService.getAll({ size: 50 }).then((r) => r.content).catch(() => []),
       ]);
-      setFollowUps(fRes.content);
+      setFollowUps(fRes.content || []);
       setStudents(sRes);
       if (sRes.length > 0) setSelectedStudentId(sRes[0].id);
     } catch (err) {
@@ -46,15 +45,14 @@ export const FollowUpList: React.FC = () => {
     try {
       await followUpService.create({
         studentId: selectedStudentId,
-        followUpType,
-        followUpDate,
-        notes,
-        outcome,
-        nextActionRequired,
+        counselingDate,
+        topicsDiscussed,
+        actionPlan,
+        status: followUpStatus,
       });
       setIsCreateOpen(false);
-      setNotes('');
-      setOutcome('');
+      setTopicsDiscussed('');
+      setActionPlan('');
       fetchData();
     } catch (err) {
       alert('Gagal menyimpan catatan evaluasi pembinaan.');
@@ -91,39 +89,31 @@ export const FollowUpList: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="py-3 px-4 font-semibold">Tanggal</th>
-                  <th className="py-3 px-4 font-semibold">Mahasiswa Binaan</th>
-                  <th className="py-3 px-4 font-semibold">Jenis Konseling</th>
-                  <th className="py-3 px-4 font-semibold">Catatan Pembinaan</th>
-                  <th className="py-3 px-4 font-semibold">Hasil / Komitmen Mahasiswa</th>
-                  <th className="py-3 px-4 font-semibold text-center">Tindak Lanjut Lanjutan</th>
+                  <th className="py-3 px-3 font-semibold">Tanggal</th>
+                  <th className="py-3 px-3 font-semibold">Mahasiswa Binaan</th>
+                  <th className="py-3 px-3 font-semibold">Pembina</th>
+                  <th className="py-3 px-3 font-semibold">Topik Konseling</th>
+                  <th className="py-3 px-3 font-semibold">Rencana Tindak Lanjut</th>
+                  <th className="py-3 px-3 font-semibold text-center">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {followUps.map((f) => (
+                {followUps.map((f: any) => (
                   <tr key={f.id} className="hover:bg-slate-50/70 transition">
-                    <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">{f.followUpDate}</td>
-                    <td className="py-3.5 px-4">
+                    <td className="py-3 px-3 text-slate-500 whitespace-nowrap">{f.counselingDate || f.followUpDate}</td>
+                    <td className="py-3 px-3">
                       <p className="font-semibold text-slate-900">{f.studentName}</p>
                       <p className="text-[10px] text-slate-400 font-mono">{f.studentNim}</p>
                     </td>
-                    <td className="py-3.5 px-4">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-                        {f.followUpType}
+                    <td className="py-3 px-3 text-slate-600">{f.conductedByUserName || '-'}</td>
+                    <td className="py-3 px-3 text-slate-700 max-w-xs">{f.topicsDiscussed || f.notes}</td>
+                    <td className="py-3 px-3 text-slate-600 max-w-xs font-medium">{f.actionPlan || f.outcome || '-'}</td>
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        f.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {f.status || (f.nextActionRequired ? 'FOLLOW_UP_NEEDED' : 'COMPLETED')}
                       </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-700 max-w-xs">{f.notes}</td>
-                    <td className="py-3.5 px-4 text-slate-600 max-w-xs font-medium">{f.outcome || '-'}</td>
-                    <td className="py-3.5 px-4 text-center">
-                      {f.nextActionRequired ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
-                          Perlu Pantauan
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                          Selesai
-                        </span>
-                      )}
                     </td>
                   </tr>
                 ))}
@@ -146,53 +136,41 @@ export const FollowUpList: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select
-              label="Jenis Pembinaan / Bimbingan"
-              value={followUpType}
-              onChange={(e) => setFollowUpType(e.target.value)}
+              label="Status Sesi Bimbingan"
+              value={followUpStatus}
+              onChange={(e) => setFollowUpStatus(e.target.value)}
               options={[
-                { value: 'PASTORAL_COUNSELING', label: 'Bimbingan Rohani / Pastoral' },
-                { value: 'DISCIPLINARY_CALL', label: 'Panggilan Disiplin Poin Tinggi' },
-                { value: 'HOME_VISITATION', label: 'Kunjungan Tempat Tinggal (Kos)' },
-                { value: 'PARENT_COORDINATION', label: 'Koordinasi dengan Orang Tua' },
+                { value: 'SCHEDULED', label: 'Terjadwal (SCHEDULED)' },
+                { value: 'COMPLETED', label: 'Selesai (COMPLETED)' },
+                { value: 'FOLLOW_UP_NEEDED', label: 'Perlu Tindak Lanjut' },
               ]}
             />
             <Input
               label="Tanggal Pertemuan"
               type="date"
               required
-              value={followUpDate}
-              onChange={(e) => setFollowUpDate(e.target.value)}
+              value={counselingDate}
+              onChange={(e) => setCounselingDate(e.target.value)}
             />
           </div>
 
           <Textarea
-            label="Catatan Hasil Konseling / Pembinaan"
+            label="Topik & Catatan Hasil Konseling"
             required
             rows={3}
-            placeholder="Jelaskan kendala yang dialami mahasiswa dan saran pembinaan yang diberikan..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Jelaskan kendala yang dialami mahasiswa dan topik konseling yang dibahas..."
+            value={topicsDiscussed}
+            onChange={(e) => setTopicsDiscussed(e.target.value)}
           />
 
-          <Input
+          <Textarea
             label="Komitmen Mahasiswa / Rencana Tindak Lanjut"
+            required
+            rows={2}
             placeholder="Contoh: Berkomitmen hadir tepat waktu setiap Vesper dan Sabat Pagi"
-            value={outcome}
-            onChange={(e) => setOutcome(e.target.value)}
+            value={actionPlan}
+            onChange={(e) => setActionPlan(e.target.value)}
           />
-
-          <div className="flex items-center gap-2 pt-2">
-            <input
-              type="checkbox"
-              id="nextAction"
-              checked={nextActionRequired}
-              onChange={(e) => setNextActionRequired(e.target.checked)}
-              className="w-4 h-4 text-purple-600 rounded"
-            />
-            <label htmlFor="nextAction" className="text-xs font-semibold text-slate-700">
-              Perlu evaluasi lanjutan pekan depan
-            </label>
-          </div>
 
           <div className="flex justify-end gap-2 pt-3">
             <Button type="button" variant="secondary" onClick={() => setIsCreateOpen(false)}>Batal</Button>

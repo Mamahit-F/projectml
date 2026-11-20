@@ -94,46 +94,50 @@ export const UserManagement: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="py-3 px-4 font-semibold">Nama Lengkap</th>
-                  <th className="py-3 px-4 font-semibold">Username</th>
-                  <th className="py-3 px-4 font-semibold">Email</th>
-                  <th className="py-3 px-4 font-semibold">Hak Akses (Role)</th>
-                  <th className="py-3 px-4 font-semibold text-center">Status Akun</th>
-                  <th className="py-3 px-4 font-semibold text-right">Aksi</th>
+                  <th className="py-3 px-3 font-semibold">Nama Lengkap</th>
+                  <th className="py-3 px-3 font-semibold">Username</th>
+                  <th className="py-3 px-3 font-semibold">Email</th>
+                  <th className="py-3 px-3 font-semibold">Role</th>
+                  <th className="py-3 px-3 font-semibold text-center">Status</th>
+                  <th className="py-3 px-3 font-semibold text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {users.map((u) => (
+                {users.map((u: any) => {
+                  const cleanRole = String(u.role || '').replace(/^ROLE_/, '');
+                  const isActive = u.active ?? u.enabled;
+                  return (
                   <tr key={u.id} className="hover:bg-slate-50/70 transition">
-                    <td className="py-3.5 px-4 font-semibold text-slate-900">{u.fullName}</td>
-                    <td className="py-3.5 px-4 font-mono text-slate-500">{u.username}</td>
-                    <td className="py-3.5 px-4 text-slate-600">{u.email}</td>
-                    <td className="py-3.5 px-4">
+                    <td className="py-3 px-3 font-semibold text-slate-900">{u.fullName}</td>
+                    <td className="py-3 px-3 font-mono text-slate-500">{u.username}</td>
+                    <td className="py-3 px-3 text-slate-600">{u.email}</td>
+                    <td className="py-3 px-3 whitespace-nowrap">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        u.role === 'ADMIN' ? 'bg-red-100 text-red-700' :
-                        u.role === 'VILLAGE_DEAN' ? 'bg-purple-100 text-purple-700' :
+                        cleanRole === 'ADMIN' ? 'bg-red-100 text-red-700' :
+                        cleanRole === 'VILLAGE_DEAN' ? 'bg-purple-100 text-purple-700' :
                         'bg-blue-100 text-blue-700'
                       }`}>
-                        {u.role}
+                        {cleanRole}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <Badge color={u.enabled ? 'green' : 'gray'}>
-                        {u.enabled ? 'Aktif' : 'Nonaktif'}
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                      <Badge color={isActive ? 'green' : 'gray'}>
+                        {isActive ? 'Aktif' : 'Nonaktif'}
                       </Badge>
                     </td>
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="py-3 px-3 text-right whitespace-nowrap">
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => handleToggleStatus(u.id)}
-                        className={u.enabled ? 'text-red-600 hover:bg-red-50' : 'text-emerald-600 hover:bg-emerald-50'}
+                        className={isActive ? 'text-red-600 hover:bg-red-50' : 'text-emerald-600 hover:bg-emerald-50'}
                       >
-                        {u.enabled ? 'Nonaktifkan' : 'Aktifkan'}
+                        {isActive ? 'Nonaktifkan' : 'Aktifkan'}
                       </Button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -140,22 +140,22 @@ export const AttendanceList: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="py-3 px-4 font-semibold">NIM</th>
-                  <th className="py-3 px-4 font-semibold">Nama Mahasiswa</th>
-                  <th className="py-3 px-4 font-semibold">Kategori</th>
-                  <th className="py-3 px-4 font-semibold">Status Kehadiran</th>
-                  <th className="py-3 px-4 font-semibold">Metode</th>
-                  <th className="py-3 px-4 font-semibold">Keterangan / Verifikasi</th>
-                  <th className="py-3 px-4 font-semibold text-right">Koreksi</th>
+                  <th className="py-3 px-3 font-semibold">NIM</th>
+                  <th className="py-3 px-3 font-semibold">Nama Mahasiswa</th>
+                  <th className="py-3 px-3 font-semibold">Kategori</th>
+                  <th className="py-3 px-3 font-semibold">Status</th>
+                  <th className="py-3 px-3 font-semibold">Metode</th>
+                  <th className="py-3 px-3 font-semibold">Keterangan</th>
+                  <th className="py-3 px-3 font-semibold text-right">Koreksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {attendances.map((att) => (
+                {attendances.map((att: any) => (
                   <tr key={att.id} className="hover:bg-slate-50/70 transition">
-                    <td className="py-3.5 px-4 font-mono font-medium text-slate-800">{att.studentNim}</td>
-                    <td className="py-3.5 px-4 font-medium text-slate-900">{att.studentName}</td>
-                    <td className="py-3.5 px-4 text-slate-500">{att.residenceCategoryName}</td>
-                    <td className="py-3.5 px-4">
+                    <td className="py-3 px-3 font-mono font-medium text-slate-800 whitespace-nowrap">{att.studentNim}</td>
+                    <td className="py-3 px-3 font-medium text-slate-900">{att.studentName}</td>
+                    <td className="py-3 px-3 text-slate-500 whitespace-nowrap">{att.studentResidenceName || att.residenceCategoryName || '-'}</td>
+                    <td className="py-3 px-3 whitespace-nowrap">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                         att.status === 'PRESENT' ? 'bg-emerald-100 text-emerald-800' :
                         att.status === 'ABSENT' ? 'bg-red-100 text-red-800' :
@@ -166,11 +166,11 @@ export const AttendanceList: React.FC = () => {
                         {att.status}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 font-mono text-[11px] text-slate-500">{att.method}</td>
-                    <td className="py-3.5 px-4 text-slate-500">
-                      {att.notes || (att.verifiedBy ? `Diverifikasi: ${att.verifiedBy}` : '-')}
+                    <td className="py-3 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">{att.recordedMethod || att.method || '-'}</td>
+                    <td className="py-3 px-3 text-slate-500 max-w-[180px] truncate">
+                      {att.notes || (att.verifiedByName || att.verifiedBy ? `Diverifikasi: ${att.verifiedByName || att.verifiedBy}` : '-')}
                     </td>
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="py-3 px-3 text-right whitespace-nowrap">
                       <Button
                         size="sm"
                         variant="secondary"

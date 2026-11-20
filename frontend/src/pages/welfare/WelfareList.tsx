@@ -13,13 +13,13 @@ export const WelfareList: React.FC = () => {
   // Create Modal
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<number>(1);
-  const [category, setCategory] = useState<string>('HEALTH');
-  const [title, setTitle] = useState('');
+  const [reportType, setReportType] = useState<string>('HEALTH');
+  const [priority, setPriority] = useState<string>('MEDIUM');
   const [description, setDescription] = useState('');
   const [creating, setCreating] = useState(false);
 
   // Detail / Resolve Modal
-  const [viewingReport, setViewingReport] = useState<WelfareReport | null>(null);
+  const [viewingReport, setViewingReport] = useState<any | null>(null);
   const [resolutionText, setResolutionText] = useState('');
   const [resolving, setResolving] = useState(false);
 
@@ -30,7 +30,7 @@ export const WelfareList: React.FC = () => {
         welfareService.getAll({ status: statusFilter, size: 20 }),
         studentService.getAll({ size: 50 }).then((r) => r.content).catch(() => []),
       ]);
-      setReports(wRes.content);
+      setReports(wRes.content || []);
       setStudents(sRes);
       if (sRes.length > 0) setSelectedStudentId(sRes[0].id);
     } catch (err) {
@@ -50,13 +50,11 @@ export const WelfareList: React.FC = () => {
     try {
       await welfareService.create({
         studentId: selectedStudentId,
-        category: category as any,
-        title,
+        reportType,
+        priority,
         description,
-        status: 'OPEN',
-      });
+      } as any);
       setIsCreateOpen(false);
-      setTitle('');
       setDescription('');
       fetchData();
     } catch (err) {
@@ -72,8 +70,8 @@ export const WelfareList: React.FC = () => {
     try {
       await welfareService.update(viewingReport.id, {
         status: 'RESOLVED',
-        resolution: resolutionText,
-      });
+        resolutionNotes: resolutionText,
+      } as any);
       setViewingReport(null);
       setResolutionText('');
       fetchData();
@@ -103,8 +101,8 @@ export const WelfareList: React.FC = () => {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex gap-2">
-        {['SEMUA', 'OPEN', 'IN_PROGRESS', 'RESOLVED'].map((st) => (
+      <div className="flex flex-wrap gap-2">
+        {['SEMUA', 'OPEN', 'IN_REVIEW', 'RESOLVED', 'CLOSED'].map((st) => (
           <Button
             key={st}
             size="sm"
@@ -127,49 +125,58 @@ export const WelfareList: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="py-3 px-4 font-semibold">Tanggal</th>
-                  <th className="py-3 px-4 font-semibold">Mahasiswa</th>
-                  <th className="py-3 px-4 font-semibold">Kategori Kasus</th>
-                  <th className="py-3 px-4 font-semibold">Judul Masalah</th>
-                  <th className="py-3 px-4 font-semibold text-center">Status</th>
-                  <th className="py-3 px-4 font-semibold text-right">Aksi</th>
+                  <th className="py-3 px-3 font-semibold">Tanggal</th>
+                  <th className="py-3 px-3 font-semibold">Mahasiswa</th>
+                  <th className="py-3 px-3 font-semibold">Kategori & Prioritas</th>
+                  <th className="py-3 px-3 font-semibold">Deskripsi Masalah</th>
+                  <th className="py-3 px-3 font-semibold text-center">Status</th>
+                  <th className="py-3 px-3 font-semibold text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {reports.map((r) => (
+                {reports.map((r: any) => (
                   <tr key={r.id} className="hover:bg-slate-50/70 transition">
-                    <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
+                    <td className="py-3 px-3 text-slate-500 whitespace-nowrap">
                       {new Date(r.createdAt).toLocaleDateString('id-ID')}
                     </td>
-                    <td className="py-3.5 px-4">
+                    <td className="py-3 px-3">
                       <p className="font-semibold text-slate-900">{r.studentName}</p>
                       <p className="text-[10px] text-slate-400 font-mono">{r.studentNim}</p>
                     </td>
-                    <td className="py-3.5 px-4">
+                    <td className="py-3 px-3 whitespace-nowrap">
                       <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
-                        {r.category}
+                        {r.reportType || r.category}
                       </span>
+                      {r.priority && (
+                        <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          r.priority === 'HIGH' || r.priority === 'URGENT' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
+                        }`}>
+                          {r.priority}
+                        </span>
+                      )}
                     </td>
-                    <td className="py-3.5 px-4 font-medium text-slate-800">{r.title}</td>
-                    <td className="py-3.5 px-4 text-center">
+                    <td className="py-3 px-3 font-medium text-slate-800 max-w-[260px] truncate">
+                      {r.title || r.description}
+                    </td>
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
                       <Badge color={
-                        r.status === 'RESOLVED' ? 'green' :
+                        r.status === 'RESOLVED' || r.status === 'CLOSED' ? 'green' :
                         r.status === 'OPEN' ? 'red' : 'yellow'
                       }>
                         {r.status}
                       </Badge>
                     </td>
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="py-3 px-3 text-right whitespace-nowrap">
                       <Button
                         size="sm"
                         variant="secondary"
                         icon={<Eye className="w-3.5 h-3.5" />}
                         onClick={() => {
                           setViewingReport(r);
-                          setResolutionText(r.resolution || '');
+                          setResolutionText(r.resolutionNotes || r.resolution || '');
                         }}
                       >
-                        Detail & Tangani
+                        Detail
                       </Button>
                     </td>
                   </tr>
@@ -191,27 +198,33 @@ export const WelfareList: React.FC = () => {
             options={students.map((s) => ({ value: s.id, label: `${s.fullName} (${s.nim})` }))}
           />
 
-          <Select
-            label="Kategori Permasalahan"
-            required
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            options={[
-              { value: 'HEALTH', label: 'Kesehatan / Sakit Rawat' },
-              { value: 'FINANCIAL', label: 'Kendala Finansial / Makanan' },
-              { value: 'ACADEMIC', label: 'Kendala Kuliah / Beban Akademik' },
-              { value: 'SOCIAL', label: 'Permasalahan Tempat Tinggal / Kos' },
-              { value: 'OTHER', label: 'Permasalahan Lainnya' },
-            ]}
-          />
-
-          <Input
-            label="Judul Laporan"
-            required
-            placeholder="Contoh: Mahasiswa sakit tifus di kos tanpa keluarga"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Select
+              label="Kategori Permasalahan"
+              required
+              value={reportType}
+              onChange={(e) => setReportType(e.target.value)}
+              options={[
+                { value: 'HEALTH', label: 'Kesehatan / Sakit Rawat' },
+                { value: 'HOUSING', label: 'Tempat Tinggal / Indekos' },
+                { value: 'FINANCIAL', label: 'Kendala Finansial / Makanan' },
+                { value: 'SECURITY', label: 'Keamanan & Keselamatan' },
+                { value: 'GENERAL_AID', label: 'Bantuan Umum Lainnya' },
+              ]}
+            />
+            <Select
+              label="Prioritas"
+              required
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              options={[
+                { value: 'LOW', label: 'LOW' },
+                { value: 'MEDIUM', label: 'MEDIUM' },
+                { value: 'HIGH', label: 'HIGH' },
+                { value: 'URGENT', label: 'URGENT' },
+              ]}
+            />
+          </div>
 
           <Textarea
             label="Deskripsi Lengkap Kondisi & Kebutuhan Bantuan"
@@ -236,9 +249,11 @@ export const WelfareList: React.FC = () => {
         {viewingReport && (
           <div className="space-y-4 text-xs">
             <div className="p-3 bg-slate-50 rounded-xl">
-              <p className="font-bold text-sm text-slate-900">{viewingReport.title}</p>
+              <p className="font-bold text-sm text-slate-900">
+                {viewingReport.reportType || viewingReport.category} {viewingReport.priority ? `(${viewingReport.priority})` : ''}
+              </p>
               <p className="text-slate-500 mt-1 font-mono">
-                Mahasiswa: {viewingReport.studentName} ({viewingReport.studentNim}) • Kategori: {viewingReport.category}
+                Mahasiswa: {viewingReport.studentName} ({viewingReport.studentNim}) • Status: {viewingReport.status}
               </p>
               <p className="mt-3 text-slate-700 leading-relaxed text-xs">{viewingReport.description}</p>
             </div>

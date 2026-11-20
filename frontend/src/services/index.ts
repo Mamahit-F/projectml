@@ -10,16 +10,26 @@ export * from './welfareService';
 
 
 export const followUpService = {
-  getAll: async (params?: { page?: number; size?: number; studentId?: number }) => {
-    const res = await api.get<ApiResponse<PageResponse<FollowUp>>>('/follow-ups', { params });
+  getAll: async (params?: { page?: number; size?: number; studentId?: number }): Promise<PageResponse<any>> => {
+    const res = await api.get<ApiResponse<any>>('/follow-ups', { params });
+    const payload = res.data.data;
+    if (Array.isArray(payload)) {
+      return {
+        content: payload,
+        totalElements: payload.length,
+        totalPages: 1,
+        size: payload.length,
+        number: 0,
+      };
+    }
+    return payload || { content: [], totalElements: 0, totalPages: 0, size: 0, number: 0 };
+  },
+  create: async (data: any): Promise<any> => {
+    const res = await api.post<ApiResponse<any>>('/follow-ups', data);
     return res.data.data;
   },
-  create: async (data: Partial<FollowUp>): Promise<FollowUp> => {
-    const res = await api.post<ApiResponse<FollowUp>>('/follow-ups', data);
-    return res.data.data;
-  },
-  getByStudent: async (studentId: number): Promise<FollowUp[]> => {
-    const res = await api.get<ApiResponse<FollowUp[]>>(`/follow-ups/student/${studentId}`);
+  getByStudent: async (studentId: number): Promise<any[]> => {
+    const res = await api.get<ApiResponse<any[]>>(`/follow-ups/student/${studentId}`);
     return res.data.data;
   },
 };
@@ -80,7 +90,9 @@ export const userService = {
     return res.data.data;
   },
   create: async (data: Partial<import('../types').User> & { password: string }): Promise<import('../types').User> => {
-    const res = await api.post('/users', data);
+    const roleStr = String(data.role || 'STAFF');
+    const normalizedRole = roleStr.startsWith('ROLE_') ? roleStr : `ROLE_${roleStr}`;
+    const res = await api.post('/users', { ...data, role: normalizedRole });
     return res.data.data;
   },
   update: async (id: number, data: Partial<import('../types').User>): Promise<import('../types').User> => {

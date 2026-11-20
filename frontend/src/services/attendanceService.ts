@@ -2,8 +2,17 @@ import api from './api';
 import type { Attendance, AttendanceRule, PageResponse, ApiResponse } from '../types';
 
 export const attendanceService = {
-  getAll: async (params?: { page?: number; size?: number; eventId?: number; studentId?: number; status?: string }) => {
-    const res = await api.get<ApiResponse<PageResponse<Attendance>>>('/attendances', { params });
+  getAll: async (params?: { page?: number; size?: number; eventId?: number; worshipEventId?: number; studentId?: number; status?: string }) => {
+    const queryParams = params
+      ? {
+          page: params.page,
+          size: params.size,
+          worshipEventId: params.worshipEventId ?? params.eventId,
+          studentId: params.studentId,
+          status: params.status,
+        }
+      : undefined;
+    const res = await api.get<ApiResponse<PageResponse<Attendance>>>('/attendances', { params: queryParams });
     return res.data.data;
   },
   scanQr: async (qrToken: string, worshipEventId: number): Promise<Attendance> => {
