@@ -13,20 +13,27 @@ import java.util.Optional;
 @Repository
 public interface StudentRepository extends JpaRepository<Student, Long> {
     Optional<Student> findByNim(String nim);
-    Optional<Student> findByQrToken(String qrToken);
     boolean existsByNim(String nim);
     List<Student> findByStatus(String status);
     List<Student> findByResidenceCategoryId(Long residenceCategoryId);
 
+    @Query("SELECT DISTINCT s.studyProgram FROM Student s WHERE s.studyProgram IS NOT NULL ORDER BY s.studyProgram ASC")
+    List<String> findDistinctStudyPrograms();
+
     @Query("SELECT s FROM Student s WHERE " +
-           "(:search IS NULL OR CAST(:search AS string) = '' OR LOWER(s.nim) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) OR LOWER(s.fullName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))) AND " +
-           "(:residenceCategoryId IS NULL OR s.residenceCategory.id = :residenceCategoryId) AND " +
+           "(:search IS NULL OR CAST(:search AS string) = '' OR LOWER(s.nim) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) " +
+           " OR LOWER(s.fullName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) " +
+           " OR LOWER(s.studyProgram) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))) AND " +
+           "(:studyProgram IS NULL OR CAST(:studyProgram AS string) = '' OR LOWER(s.studyProgram) = LOWER(CAST(:studyProgram AS string))) AND " +
+           "(:riskCategory IS NULL OR CAST(:riskCategory AS string) = '' OR UPPER(s.riskCategory) = UPPER(CAST(:riskCategory AS string))) AND " +
+           "(:residenceCategoryId IS NULL OR (s.residenceCategory IS NOT NULL AND s.residenceCategory.id = :residenceCategoryId)) AND " +
            "(:status IS NULL OR CAST(:status AS string) = '' OR s.status = CAST(:status AS string))")
     Page<Student> searchStudents(@Param("search") String search,
+                                 @Param("studyProgram") String studyProgram,
+                                 @Param("riskCategory") String riskCategory,
                                  @Param("residenceCategoryId") Long residenceCategoryId,
                                  @Param("status") String status,
                                  Pageable pageable);
 
-    long countByResidenceCategoryId(Long residenceCategoryId);
     long countByStatus(String status);
 }

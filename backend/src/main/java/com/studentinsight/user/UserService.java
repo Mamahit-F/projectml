@@ -58,7 +58,7 @@ public class UserService {
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .fullName(request.getFullName())
-                .role(request.getRole())
+                .role(Role.ROLE_USER)
                 .active(true)
                 .build();
 
@@ -79,7 +79,7 @@ public class UserService {
         String oldRole = user.getRole().name();
         user.setEmail(request.getEmail());
         user.setFullName(request.getFullName());
-        user.setRole(request.getRole());
+        user.setRole(Role.ROLE_USER);
 
         if (StringUtils.hasText(request.getNewPassword())) {
             user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));

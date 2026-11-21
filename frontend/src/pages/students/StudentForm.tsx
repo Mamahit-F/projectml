@@ -1,238 +1,148 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
-import { studentService, residenceService } from '../../services';
+import { studentService } from '../../services';
 import type { ResidenceCategory } from '../../types';
-import { Button, Input, Select, Textarea } from '../../components/ui';
+import { Button, Input, Select, Textarea, LoadingState } from '../../components/ui';
 
 export const StudentForm: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const isEdit = !!id;
+  const { id } = useParams();
   const navigate = useNavigate();
+
+  const [categories, setCategories] = useState<ResidenceCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [nim, setNim] = useState('');
   const [fullName, setFullName] = useState('');
-  const [studyProgram, setStudyProgram] = useState('');
-  const [faculty, setFaculty] = useState('');
+  const [studyProgram, setStudyProgram] = useState('Informatika');
+  const [faculty, setFaculty] = useState('Fakultas Ilmu Komputer');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [residenceCategoryId, setResidenceCategoryId] = useState<number>(1);
+  const [residenceCategoryId, setResidenceCategoryId] = useState<string>('');
   const [currentAddress, setCurrentAddress] = useState('');
   const [status, setStatus] = useState('ACTIVE');
-
-  // Emergency Contact Form Fields
-  const [contactName, setContactName] = useState('');
-  const [relationship, setRelationship] = useState('Orang Tua');
-  const [contactPhone, setContactPhone] = useState('');
-
-  const [categories, setCategories] = useState<ResidenceCategory[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [latestSabbathPoints, setLatestSabbathPoints] = useState<number>(0);
 
   useEffect(() => {
-    residenceService.getAll().then((cats) => {
-      setCategories(cats);
-      if (cats.length > 0 && !isEdit) {
-        setResidenceCategoryId(cats[0].id);
-      }
-    });
-
-    if (isEdit) {
-      setLoading(true);
-      studentService.getById(Number(id)).then((s: any) => {
+    if (!id) {
+      navigate('/students', { replace: true });
+      return;
+    }
+    studentService.getResidenceCategories().then(setCategories).catch(() => {});
+    studentService
+      .getById(Number(id))
+      .then((s) => {
         setNim(s.nim);
         setFullName(s.fullName);
-        setStudyProgram(s.studyProgram || s.programStudy || '');
-        setFaculty(s.faculty || '');
+        setStudyProgram(s.studyProgram);
+        setFaculty(s.faculty);
         setPhoneNumber(s.phoneNumber || '');
-        setResidenceCategoryId(s.residenceCategory?.id || s.residenceCategoryId || 1);
-        setCurrentAddress(s.currentAddress || s.residenceAddress || '');
-        setStatus(s.status);
-
-        if (s.emergencyContacts && s.emergencyContacts.length > 0) {
-          const ec = s.emergencyContacts[0];
-          setContactName(ec.contactName);
-          setRelationship(ec.relationship);
-          setContactPhone(ec.phoneNumber);
-        }
-      }).finally(() => setLoading(false));
-    }
-  }, [id, isEdit]);
+        setResidenceCategoryId(s.residenceCategory ? String(s.residenceCategory.id) : '');
+        setCurrentAddress(s.currentAddress || '');
+        setStatus(s.status || 'ACTIVE');
+        setLatestSabbathPoints(s.latestSabbathPoints || 0);
+      })
+      .catch(() => navigate('/students', { replace: true }))
+      .finally(() => setLoading(false));
+  }, [id, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    const payload: any = {
-      nim,
-      fullName,
-      studyProgram,
-      faculty,
-      phoneNumber,
-      residenceCategoryId: Number(residenceCategoryId),
-      currentAddress,
-      status,
-      emergencyContactName: contactName || undefined,
-      emergencyRelationship: contactName ? relationship : undefined,
-      emergencyPhone: contactName ? contactPhone : undefined,
-    };
-
+    if (!id) return;
+    setSaving(true);
     try {
-      if (isEdit) {
-        await studentService.update(Number(id), payload);
-      } else {
-        await studentService.create(payload);
-      }
-      navigate('/students');
+      await studentService.update(Number(id), {
+        fullName,
+        studyProgram,
+        faculty,
+        phoneNumber: phoneNumber || null,
+        residenceCategoryId: residenceCategoryId ? Number(residenceCategoryId) : null,
+        currentAddress: currentAddress || null,
+        status,
+        latestSabbathPoints: Number(latestSabbathPoints) || 0,
+      });
+      navigate(`/students/${id}`);
     } catch (err: any) {
-      const validationMap = err.response?.data?.data;
-      if (validationMap && typeof validationMap === 'object') {
-        setError(Object.values(validationMap).join(', '));
-      } else {
-        setError(err.response?.data?.message || 'Gagal menyimpan data mahasiswa.');
-      }
+      alert(err.response?.data?.message || 'Gagal menyimpan data mahasiswa.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
+  if (loading) return <LoadingState />;
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <Link to="/students" className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800">
-        <ArrowLeft className="w-4 h-4" /> Batal dan Kembali
-      </Link>
-
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 sm:p-8">
-        <h1 className="text-xl font-bold text-slate-900 mb-1">
-          {isEdit ? 'Ubah Data Mahasiswa' : 'Pendaftaran Mahasiswa Outsider Baru'}
-        </h1>
-        <p className="text-xs text-slate-500 mb-6">
-          Lengkapi data profil tempat tinggal dan kontak darurat mahasiswa.
-        </p>
-
-        {error && (
-          <div className="mb-6 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Section: Academic & Identity */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="NIM (Nomor Induk Mahasiswa)"
-              required
-              disabled={isEdit}
-              placeholder="Contoh: 105022110001"
-              value={nim}
-              onChange={(e) => setNim(e.target.value)}
-            />
-            <Input
-              label="Nama Lengkap"
-              required
-              placeholder="Nama sesuai KTP/KTM"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Input
-              label="Program Studi"
-              required
-              placeholder="Contoh: Informatika / Sistem Informasi"
-              value={studyProgram}
-              onChange={(e) => setStudyProgram(e.target.value)}
-            />
-            <Input
-              label="Fakultas"
-              required
-              placeholder="Contoh: Fakultas Ilmu Komputer"
-              value={faculty}
-              onChange={(e) => setFaculty(e.target.value)}
-            />
-            <Input
-              label="Nomor WhatsApp / HP Mahasiswa"
-              placeholder="08xxxxxxxxxx"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-            />
-          </div>
-
-          {/* Section: Residence Category */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Select
-              label="Kategori Tempat Tinggal"
-              required
-              value={residenceCategoryId}
-              onChange={(e) => setResidenceCategoryId(Number(e.target.value))}
-              options={categories.map((c) => ({ value: c.id, label: c.name }))}
-            />
-            {isEdit && (
-              <Select
-                label="Status Mahasiswa"
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                options={[
-                  { value: 'ACTIVE', label: 'Aktif' },
-                  { value: 'INACTIVE', label: 'Nonaktif' },
-                  { value: 'GRADUATED', label: 'Lulus' },
-                ]}
-              />
-            )}
-          </div>
-
-          <Textarea
-            label="Alamat Lengkap Tempat Tinggal (Kos / Rumah)"
-            required
-            rows={2}
-            placeholder="Alamat detail kos, nomor kamar, nama pemilik kos..."
-            value={currentAddress}
-            onChange={(e) => setCurrentAddress(e.target.value)}
-          />
-
-          {/* Section: Emergency Contact */}
-          <div className="pt-4 border-t border-slate-100">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">
-              Kontak Darurat (Wajib untuk Outsider)
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Input
-                label="Nama Kontak"
-                placeholder="Nama Orang Tua / Wali"
-                value={contactName}
-                onChange={(e) => setContactName(e.target.value)}
-              />
-              <Input
-                label="Hubungan"
-                placeholder="Ayah / Ibu / Wali"
-                value={relationship}
-                onChange={(e) => setRelationship(e.target.value)}
-              />
-              <Input
-                label="No HP Darurat"
-                placeholder="08xxxxxxxxxx"
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="pt-4 flex justify-end gap-3">
-            <Button type="button" variant="secondary" onClick={() => navigate('/students')}>
-              Batal
-            </Button>
-            <Button
-              type="submit"
-              loading={loading}
-              icon={<Save className="w-4 h-4" />}
-              className="bg-emerald-700 hover:bg-emerald-800 text-white"
-            >
-              Simpan Data Mahasiswa
-            </Button>
-          </div>
-        </form>
+      <div className="flex items-center gap-3">
+        <Button variant="secondary" size="sm" icon={<ArrowLeft className="w-3.5 h-3.5" />} onClick={() => navigate(-1)}>
+          Kembali
+        </Button>
+        <div>
+          <h1 className="text-xl font-extrabold text-obsidian">Lengkapi Profil Mahasiswa</h1>
+          <p className="text-xs text-slate-500">
+            Lengkapi kategori tempat tinggal (Outsider Dekat / Jauh), alamat kos, dan nomor telepon
+          </p>
+        </div>
       </div>
+
+      <form onSubmit={handleSubmit} className="bg-white rounded-3xl border border-[#ECEEF2] shadow-card p-6 sm:p-8 space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Input label="Nomor Registrasi / NIM" disabled value={nim} />
+          <Input label="Nama Lengkap" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <Input label="Program Studi" required value={studyProgram} onChange={(e) => setStudyProgram(e.target.value)} />
+          <Input label="Fakultas" required value={faculty} onChange={(e) => setFaculty(e.target.value)} />
+          <Select
+            label="Kategori Tempat Tinggal (Opsional)"
+            value={residenceCategoryId}
+            onChange={(e) => setResidenceCategoryId(e.target.value)}
+            options={[
+              { value: '', label: '— Belum Ditentukan —' },
+              ...categories.map((c) => ({ value: String(c.id), label: c.name })),
+            ]}
+          />
+          <Input
+            label="Nomor Telepon Mahasiswa"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            placeholder="08xxxxxxxxxx"
+          />
+          <Input
+            label="Poin Sabat Terbaru"
+            type="number"
+            min={0}
+            value={latestSabbathPoints}
+            onChange={(e) => setLatestSabbathPoints(Number(e.target.value))}
+          />
+          <Select
+            label="Status Mahasiswa"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            options={[
+              { value: 'ACTIVE', label: 'Aktif' },
+              { value: 'PROBATION', label: 'Dalam Pembinaan Khusus' },
+              { value: 'INACTIVE', label: 'Tidak Aktif' },
+              { value: 'GRADUATED', label: 'Lulus' },
+            ]}
+          />
+        </div>
+
+        <Textarea
+          label="Alamat Tempat Tinggal / Indekos"
+          rows={2}
+          value={currentAddress}
+          onChange={(e) => setCurrentAddress(e.target.value)}
+          placeholder="Nama kos, jalan, kelurahan/kecamatan..."
+        />
+
+        <div className="flex justify-end gap-2.5 pt-3">
+          <Button type="button" variant="secondary" onClick={() => navigate(-1)}>
+            Batal
+          </Button>
+          <Button type="submit" variant="primary" loading={saving} icon={<Save className="w-3.5 h-3.5" />}>
+            Simpan Perubahan
+          </Button>
+        </div>
+      </form>
     </div>
   );
 };

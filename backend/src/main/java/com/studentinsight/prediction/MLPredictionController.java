@@ -5,7 +5,6 @@ import com.studentinsight.prediction.dto.PredictionSummaryDTO;
 import com.studentinsight.prediction.dto.StudentPredictionDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,36 +17,30 @@ public class MLPredictionController {
     private final MLPredictionService predictionService;
 
     @GetMapping("/summary")
-    @PreAuthorize("hasAnyRole('ADMIN', 'VILLAGE_DEAN')")
     public ResponseEntity<ApiResponse<PredictionSummaryDTO>> getSummary() {
-        return ResponseEntity.ok(ApiResponse.ok("Prediction risk summary retrieved", predictionService.getSummary()));
+        return ResponseEntity.ok(ApiResponse.ok("Ringkasan analisis risiko dimuat", predictionService.getSummary()));
     }
 
     @GetMapping("/latest")
-    @PreAuthorize("hasAnyRole('ADMIN', 'VILLAGE_DEAN')")
-    public ResponseEntity<ApiResponse<List<StudentPredictionDTO>>> getAllLatest() {
-        return ResponseEntity.ok(ApiResponse.ok("Latest predictions for all students retrieved", predictionService.getAllLatestPredictions()));
+    public ResponseEntity<ApiResponse<List<StudentPredictionDTO>>> getAllLatest(
+            @RequestParam(required = false) String riskLevel,
+            @RequestParam(required = false) String studyProgram,
+            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Hasil deteksi risiko terbaru dimuat",
+                predictionService.getAllLatestPredictions(riskLevel, studyProgram, search)));
     }
 
     @GetMapping("/student/{studentId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'VILLAGE_DEAN')")
     public ResponseEntity<ApiResponse<StudentPredictionDTO>> getLatestByStudent(@PathVariable Long studentId) {
         return predictionService.getLatestPrediction(studentId)
-                .map(pred -> ResponseEntity.ok(ApiResponse.ok("Latest prediction retrieved", pred)))
-                .orElseGet(() -> ResponseEntity.ok(ApiResponse.ok("No prediction yet", null)));
+                .map(pred -> ResponseEntity.ok(ApiResponse.ok("Prediksi mahasiswa dimuat", pred)))
+                .orElseGet(() -> ResponseEntity.ok(ApiResponse.ok("Belum ada analisis untuk mahasiswa ini", null)));
     }
 
-    @PostMapping("/student/{studentId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'VILLAGE_DEAN')")
-    public ResponseEntity<ApiResponse<StudentPredictionDTO>> runPredictionForStudent(@PathVariable Long studentId) {
-        StudentPredictionDTO pred = predictionService.predictStudentRisk(studentId);
-        return ResponseEntity.ok(ApiResponse.ok("Prediction calculated and saved", pred));
-    }
-
-    @PostMapping("/predict-all")
-    @PreAuthorize("hasAnyRole('ADMIN', 'VILLAGE_DEAN')")
-    public ResponseEntity<ApiResponse<List<StudentPredictionDTO>>> runBatchPredictions() {
-        List<StudentPredictionDTO> results = predictionService.predictAllActiveStudents();
-        return ResponseEntity.ok(ApiResponse.ok("Batch prediction finished for all active students", results));
+    @PostMapping({"/analyze", "/predict-all"})
+    public ResponseEntity<ApiResponse<List<StudentPredictionDTO>>> runBatchAnalysis() {
+        List<StudentPredictionDTO> results = predictionService.analyzeAllActiveStudents(null);
+        return ResponseEntity.ok(ApiResponse.ok("Analisis risiko dinamis & proyeksi selesai untuk seluruh mahasiswa aktif", results));
     }
 }

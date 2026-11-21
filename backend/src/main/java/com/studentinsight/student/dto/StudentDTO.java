@@ -19,6 +19,8 @@ import java.util.stream.Collectors;
 public class StudentDTO {
     private Long id;
     private String nim;
+    private String firstName;
+    private String lastName;
     private String fullName;
     private String studyProgram;
     private String faculty;
@@ -26,8 +28,12 @@ public class StudentDTO {
     private ResidenceCategoryDTO residenceCategory;
     private String currentAddress;
     private String status;
-    private String qrToken;
     private Integer totalViolationPoints;
+    private Integer latestSabbathPoints;
+    private Integer previousSabbathPoints;
+    private Integer pointsDelta;
+    private String riskCategory;
+    private Double projectedEndPoints;
     private List<EmergencyContactDTO> emergencyContacts;
     private Instant createdAt;
 
@@ -57,19 +63,28 @@ public class StudentDTO {
         return StudentDTO.builder()
                 .id(entity.getId())
                 .nim(entity.getNim())
+                .firstName(entity.getFirstName())
+                .lastName(entity.getLastName())
                 .fullName(entity.getFullName())
                 .studyProgram(entity.getStudyProgram())
                 .faculty(entity.getFaculty())
                 .phoneNumber(entity.getPhoneNumber())
-                .residenceCategory(ResidenceCategoryDTO.fromEntity(entity.getResidenceCategory()))
+                .residenceCategory(entity.getResidenceCategory() != null
+                        ? ResidenceCategoryDTO.fromEntity(entity.getResidenceCategory())
+                        : null)
                 .currentAddress(entity.getCurrentAddress())
                 .status(entity.getStatus())
-                .qrToken(entity.getQrToken())
                 .totalViolationPoints(entity.getTotalViolationPoints())
-                .emergencyContacts(entity.getEmergencyContacts() != null ?
-                        entity.getEmergencyContacts().stream()
+                .latestSabbathPoints(entity.getLatestSabbathPoints())
+                .previousSabbathPoints(entity.getPreviousSabbathPoints())
+                .pointsDelta(entity.getPointsDelta())
+                .riskCategory(entity.getRiskCategory())
+                .projectedEndPoints(entity.getProjectedEndPoints())
+                .emergencyContacts(entity.getEmergencyContacts() != null
+                        ? entity.getEmergencyContacts().stream()
                                 .map(EmergencyContactDTO::fromEntity)
-                                .collect(Collectors.toList()) : List.of())
+                                .collect(Collectors.toList())
+                        : List.of())
                 .createdAt(entity.getCreatedAt())
                 .build();
     }

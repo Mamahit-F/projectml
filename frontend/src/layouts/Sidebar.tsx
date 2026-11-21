@@ -1,101 +1,144 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, Calendar, QrCode, ClipboardCheck,
-  AlertTriangle, BrainCircuit, HeartHandshake, FileText,
-  UserCog, Settings, ShieldAlert, LogOut, GraduationCap, MapPin
+  LayoutGrid,
+  FileUp,
+  Users,
+  BrainCircuit,
+  MessageSquareHeart,
+  HeartHandshake,
+  PhoneCall,
+  SlidersHorizontal,
+  LogOut,
+  X,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-interface NavItem {
-  to: string;
-  label: string;
-  icon: React.ReactNode;
-  roles?: string[];
+interface SidebarProps {
+  mobileOpen: boolean;
+  onClose: () => void;
 }
 
-const navItems: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-  { to: '/students', label: 'Mahasiswa', icon: <Users className="w-5 h-5" /> },
-  { to: '/events', label: 'Kegiatan Ibadah', icon: <Calendar className="w-5 h-5" /> },
-  { to: '/attendance/scan', label: 'Pindai QR', icon: <QrCode className="w-5 h-5" /> },
-  { to: '/attendance', label: 'Presensi', icon: <ClipboardCheck className="w-5 h-5" /> },
-  { to: '/violations', label: 'Poin Pelanggaran', icon: <AlertTriangle className="w-5 h-5" /> },
-  { to: '/predictions', label: 'Prediksi Risiko ML', icon: <BrainCircuit className="w-5 h-5" />, roles: ['ADMIN', 'VILLAGE_DEAN'] },
-  { to: '/welfare', label: 'Kesejahteraan', icon: <HeartHandshake className="w-5 h-5" /> },
-  { to: '/follow-up', label: 'Evaluasi & Binaan', icon: <GraduationCap className="w-5 h-5" />, roles: ['ADMIN', 'VILLAGE_DEAN'] },
-  { to: '/emergency-contacts', label: 'Kontak Darurat', icon: <ShieldAlert className="w-5 h-5" />, roles: ['ADMIN', 'VILLAGE_DEAN'] },
-  { to: '/reports', label: 'Laporan & Ekspor', icon: <FileText className="w-5 h-5" /> },
-  { to: '/residence-categories', label: 'Kategori Tempat Tinggal', icon: <MapPin className="w-5 h-5" />, roles: ['ADMIN'] },
-  { to: '/attendance-rules', label: 'Aturan Presensi', icon: <Settings className="w-5 h-5" />, roles: ['ADMIN'] },
-  { to: '/users', label: 'Kelola Pengguna', icon: <UserCog className="w-5 h-5" />, roles: ['ADMIN'] },
-  { to: '/settings', label: 'Pengaturan Sistem', icon: <Settings className="w-5 h-5" />, roles: ['ADMIN', 'VILLAGE_DEAN'] },
+const navItems = [
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
+  { to: '/pdf-reports', label: 'Unggah & Arsip PDF', icon: FileUp },
+  { to: '/students', label: 'Mahasiswa', icon: Users },
+  { to: '/predictions', label: 'Deteksi Risiko', icon: BrainCircuit },
+  { to: '/follow-up', label: 'Pembinaan', icon: MessageSquareHeart },
+  { to: '/welfare', label: 'Kesejahteraan', icon: HeartHandshake },
+  { to: '/emergency-contacts', label: 'Kontak Darurat', icon: PhoneCall },
+  { to: '/reports-settings', label: 'Laporan & Semester', icon: SlidersHorizontal },
 ];
 
-export const Sidebar: React.FC = () => {
+export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onClose }) => {
   const { user, logout } = useAuth();
+  const location = useLocation();
 
-  const filteredNavItems = navItems.filter((item) => {
-    if (!item.roles) return true;
-    return user && item.roles.includes(user.role);
-  });
+  const initials = (user?.fullName || user?.username || 'U')
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
-  return (
-    <aside className="w-64 bg-slate-900 text-slate-100 flex flex-col h-screen fixed left-0 top-0 z-30 select-none shadow-xl">
-      {/* Brand Header */}
-      <div className="h-16 flex items-center px-6 border-b border-slate-800 gap-3">
-        <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-md">
-          SI
+  const content = (
+    <aside className="w-[260px] h-full bg-white border-r border-[#ECEEF2] flex flex-col justify-between px-4 py-6 select-none">
+      <div>
+        {/* Brand Header (Finexy coral mark + Jobgio clean typography) */}
+        <div className="flex items-center justify-between px-2 mb-8">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-coral-gradient text-white flex items-center justify-center shadow-coral">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[17px] font-extrabold tracking-tight text-obsidian block leading-none">
+                StudentInsight
+              </span>
+              <span className="text-[11px] font-medium text-slate-400 mt-1 block">
+                Monitoring UNKLAB
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="lg:hidden w-8 h-8 rounded-full bg-[#F4F5F7] flex items-center justify-center text-slate-500"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-        <div>
-          <h1 className="text-base font-bold tracking-tight text-white leading-tight">StudentInsight</h1>
-          <p className="text-[10px] text-indigo-400 font-medium">Universitas Klabat</p>
-        </div>
+
+        {/* Navigation Links (Jobgio signature solid obsidian pill + white circular active icon) */}
+        <nav className="space-y-1.5">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive =
+              location.pathname === item.to ||
+              (item.to !== '/dashboard' && location.pathname.startsWith(item.to + '/'));
+
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={onClose}
+                className={`group flex items-center gap-3 px-2.5 py-2 rounded-full text-[13px] font-semibold transition-all duration-150 ${
+                  isActive
+                    ? 'bg-obsidian text-white shadow-soft'
+                    : 'text-slate-500 hover:bg-[#F4F5F7] hover:text-obsidian'
+                }`}
+              >
+                <span
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+                    isActive
+                      ? 'bg-white text-obsidian'
+                      : 'bg-[#F4F5F7] text-slate-500 group-hover:bg-white group-hover:text-obsidian'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                </span>
+                <span className="truncate">{item.label}</span>
+              </NavLink>
+            );
+          })}
+        </nav>
       </div>
 
-      {/* Navigation List */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 scrollbar-thin scrollbar-thumb-slate-700">
-        <div className="px-3 pb-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-          Menu Utama
-        </div>
-        {filteredNavItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === '/attendance'}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-                isActive
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-              }`
-            }
+      {/* Bottom User Card (Jobgio profile anchor) */}
+      <div className="pt-4 border-t border-[#F0F1F4]">
+        <div className="bg-[#F7F8FA] rounded-3xl p-3.5 flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative shrink-0">
+              <div className="w-10 h-10 rounded-full bg-obsidian text-white flex items-center justify-center text-xs font-bold">
+                {initials}
+              </div>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white absolute bottom-0 right-0" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-obsidian truncate">{user?.fullName || 'User'}</p>
+              <p className="text-[11px] text-slate-400 truncate">Peran: User</p>
+            </div>
+          </div>
+          <button
+            onClick={logout}
+            title="Keluar"
+            className="w-8 h-8 rounded-full bg-white border border-[#E5E7EB] hover:bg-coral-50 hover:text-coral-600 hover:border-coral-200 text-slate-500 flex items-center justify-center transition shrink-0"
           >
-            {item.icon}
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
-      </nav>
-
-      {/* User Info & Logout Footer */}
-      <div className="p-4 border-t border-slate-800 bg-slate-950/40">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 rounded-full bg-indigo-900 text-indigo-200 flex items-center justify-center text-xs font-semibold uppercase">
-            {user?.fullName?.charAt(0) || 'U'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-white truncate">{user?.fullName}</p>
-            <p className="text-[10px] text-slate-400 truncate">{user?.role}</p>
-          </div>
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
         </div>
-        <button
-          onClick={logout}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 rounded-md transition-colors"
-        >
-          <LogOut className="w-4 h-4" />
-          <span>Keluar Sistem</span>
-        </button>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      <div className="hidden lg:block h-screen sticky top-0 shrink-0">{content}</div>
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden flex">
+          <div className="fixed inset-0 bg-obsidian/40 backdrop-blur-xs" onClick={onClose} />
+          <div className="relative z-10 h-full">{content}</div>
+        </div>
+      )}
+    </>
   );
 };

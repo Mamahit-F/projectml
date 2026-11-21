@@ -1,32 +1,66 @@
 import api from './api';
-import type { Student, PageResponse, ApiResponse } from '../types';
+import type {
+  ApiResponse,
+  PageResponse,
+  Student,
+  StudentPointHistoryItem,
+  ResidenceCategory,
+} from '../types';
 
 export const studentService = {
-  getAll: async (params?: { page?: number; size?: number; search?: string; categoryId?: number; status?: string }) => {
+  async getAll(params?: {
+    search?: string;
+    studyProgram?: string;
+    riskCategory?: string;
+    residenceCategoryId?: number;
+    status?: string;
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    direction?: 'asc' | 'desc';
+  }) {
     const res = await api.get<ApiResponse<PageResponse<Student>>>('/students', { params });
     return res.data.data;
   },
-  getById: async (id: number): Promise<Student> => {
+
+  async getStudyPrograms() {
+    const res = await api.get<ApiResponse<string[]>>('/students/study-programs');
+    return res.data.data || [];
+  },
+
+  async getById(id: number) {
     const res = await api.get<ApiResponse<Student>>(`/students/${id}`);
     return res.data.data;
   },
-  create: async (data: Partial<Student>): Promise<Student> => {
-    const res = await api.post<ApiResponse<Student>>('/students', data);
-    return res.data.data;
+
+  async getPointHistory(id: number) {
+    const res = await api.get<ApiResponse<StudentPointHistoryItem[]>>(`/students/${id}/point-history`);
+    return res.data.data || [];
   },
-  update: async (id: number, data: Partial<Student>): Promise<Student> => {
+
+  async update(id: number, data: any) {
     const res = await api.put<ApiResponse<Student>>(`/students/${id}`, data);
     return res.data.data;
   },
-  deactivate: async (id: number): Promise<void> => {
-    await api.patch(`/students/${id}/deactivate`);
+
+  async addEmergencyContact(
+    studentId: number,
+    data: { contactName: string; relationship: string; phoneNumber: string; address?: string }
+  ) {
+    const res = await api.post<ApiResponse<Student>>(`/students/${studentId}/emergency-contacts`, data);
+    return res.data.data;
   },
-  getQrCode: async (id: number): Promise<string> => {
-    const res = await api.get<ApiResponse<{ qrCodeBase64: string }>>(`/students/${id}/qr-code`);
-    return res.data.data.qrCodeBase64;
+
+  async deleteEmergencyContact(studentId: number, contactId: number) {
+    await api.delete(`/students/${studentId}/emergency-contacts/${contactId}`);
   },
-  regenerateQr: async (id: number): Promise<string> => {
-    const res = await api.post<ApiResponse<{ qrToken: string }>>(`/students/${id}/regenerate-qr`);
-    return res.data.data.qrToken;
+
+  async archive(id: number) {
+    await api.delete(`/students/${id}`);
+  },
+
+  async getResidenceCategories() {
+    const res = await api.get<ApiResponse<ResidenceCategory[]>>('/residence-categories');
+    return res.data.data || [];
   },
 };

@@ -3,24 +3,55 @@
 @tailwind utilities;
 
 body {
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   margin: 0;
   padding: 0;
-  background-color: #f8fafc;
+  background-color: #F4F5F7;
+  color: #161618;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Custom Scrollbar */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Finexy-style diagonal stripe pattern for progress bars & accent badges */
+.bg-coral-gradient {
+  background: linear-gradient(135deg, #FF713E 0%, #E7451B 100%);
+}
+
+.bg-stripe-muted {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #ECEEF2,
+    #ECEEF2 4px,
+    #F6F7F9 4px,
+    #F6F7F9 8px
+  );
+}
+
+.bg-stripe-coral {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.16),
+    rgba(255, 255, 255, 0.16) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+/* Clean Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #D4D7DD;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #A8AEB8;
 }

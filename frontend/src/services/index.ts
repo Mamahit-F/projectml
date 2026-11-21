@@ -1,116 +1,173 @@
 import api from './api';
-import type { FollowUp, PageResponse, ApiResponse } from '../types';
+import type {
+  ApiResponse,
+  DashboardOverview,
+  EmergencyContact,
+  FollowUp,
+  PageResponse,
+  PdfPreviewResponse,
+  PdfReportSummary,
+  PredictionSummary,
+  SemesterSetting,
+  StudentPrediction,
+} from '../types';
 
-export * from './authService';
-export * from './studentService';
-export * from './eventService';
-export * from './attendanceService';
-export * from './violationService';
-export * from './welfareService';
+export { authService } from './authService';
+export { studentService } from './studentService';
+export { welfareService } from './welfareService';
 
-
-export const followUpService = {
-  getAll: async (params?: { page?: number; size?: number; studentId?: number }): Promise<PageResponse<any>> => {
-    const res = await api.get<ApiResponse<any>>('/follow-ups', { params });
-    const payload = res.data.data;
-    if (Array.isArray(payload)) {
-      return {
-        content: payload,
-        totalElements: payload.length,
-        totalPages: 1,
-        size: payload.length,
-        number: 0,
-      };
-    }
-    return payload || { content: [], totalElements: 0, totalPages: 0, size: 0, number: 0 };
-  },
-  create: async (data: any): Promise<any> => {
-    const res = await api.post<ApiResponse<any>>('/follow-ups', data);
+export const pdfReportService = {
+  async preview(file: File): Promise<PdfPreviewResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await api.post<ApiResponse<PdfPreviewResponse>>('/pdf-reports/preview', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000,
+    });
     return res.data.data;
   },
-  getByStudent: async (studentId: number): Promise<any[]> => {
-    const res = await api.get<ApiResponse<any[]>>(`/follow-ups/student/${studentId}`);
+
+  async importPdf(params: {
+    file: File;
+    reportDate: string;
+    facultyName?: string;
+    periodLabel?: string;
+    notes?: string;
+  }) {
+    const formData = new FormData();
+    formData.append('file', params.file);
+    formData.append('reportDate', params.reportDate);
+    if (params.facultyName) formData.append('facultyName', params.facultyName);
+    if (params.periodLabel) formData.append('periodLabel', params.periodLabel);
+    if (params.notes) formData.append('notes', params.notes);
+
+    const res = await api.post<ApiResponse<any>>('/pdf-reports/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 90000,
+    });
+    return res.data.data;
+  },
+
+  async getAll(): Promise<PdfReportSummary[]> {
+    const res = await api.get<ApiResponse<PdfReportSummary[]>>('/pdf-reports');
+    return res.data.data || [];
+  },
+
+  async getDetail(id: number) {
+    const res = await api.get<ApiResponse<any>>(`/pdf-reports/${id}`);
+    return res.data.data;
+  },
+
+  async getRecords(
+    id: number,
+    params?: { search?: string; studyProgram?: string; riskCategory?: string; page?: number; size?: number }
+  ) {
+    const res = await api.get<ApiResponse<PageResponse<any>>>(`/pdf-reports/${id}/records`, { params });
+    return res.data.data;
+  },
+
+  async delete(id: number) {
+    await api.delete(`/pdf-reports/${id}`);
+  },
+};
+
+export const semesterService = {
+  async get(): Promise<SemesterSetting> {
+    const res = await api.get<ApiResponse<SemesterSetting>>('/semester-settings');
+    return res.data.data;
+  },
+
+  async update(data: SemesterSetting, reanalyze = true): Promise<SemesterSetting> {
+    const res = await api.put<ApiResponse<SemesterSetting>>('/semester-settings', data, {
+      params: { reanalyze },
+    });
     return res.data.data;
   },
 };
 
 export const predictionService = {
-  runPredictions: async (): Promise<void> => {
-    await api.post('/predictions/predict-all');
-  },
-  getAll: async (params?: { riskLevel?: string; categoryId?: number }): Promise<any[]> => {
-    const res = await api.get('/predictions/latest');
-    let list = res.data.data || [];
-    if (params?.riskLevel) {
-      list = list.filter((p: any) => p.riskCategory === params.riskLevel);
-    }
-    return list;
-  },
-  getSummary: async (): Promise<import('../types').PredictionSummary> => {
-    const res = await api.get('/predictions/summary');
+  async getSummary(): Promise<PredictionSummary> {
+    const res = await api.get<ApiResponse<PredictionSummary>>('/predictions/summary');
     return res.data.data;
   },
-  getByStudent: async (studentId: number): Promise<any> => {
-    const res = await api.get(`/predictions/student/${studentId}`);
+
+  async getAll(params?: { riskLevel?: string; studyProgram?: string; search?: string }): Promise<StudentPrediction[]> {
+    const res = await api.get<ApiResponse<StudentPrediction[]>>('/predictions/latest', { params });
+    return res.data.data || [];
+  },
+
+  async getByStudent(studentId: number): Promise<StudentPrediction | null> {
+    const res = await api.get<ApiResponse<StudentPrediction | null>>(`/predictions/student/${studentId}`);
+    return res.data.data;
+  },
+
+  async runAnalysis(): Promise<StudentPrediction[]> {
+    const res = await api.post<ApiResponse<StudentPrediction[]>>('/predictions/analyze', {}, { timeout: 60000 });
+    return res.data.data || [];
+  },
+};
+
+export const followUpService = {
+  async getAll(): Promise<FollowUp[]> {
+    const res = await api.get<ApiResponse<FollowUp[]>>('/follow-ups');
+    return res.data.data || [];
+  },
+
+  async getByStudent(studentId: number): Promise<FollowUp[]> {
+    const res = await api.get<ApiResponse<FollowUp[]>>(`/follow-ups/student/${studentId}`);
+    return res.data.data || [];
+  },
+
+  async create(data: {
+    studentId: number;
+    counselingDate: string;
+    topicsDiscussed: string;
+    actionPlan: string;
+    status?: string;
+    evaluationResult?: string;
+  }) {
+    const res = await api.post<ApiResponse<FollowUp>>('/follow-ups', data);
+    return res.data.data;
+  },
+
+  async updateStatus(id: number, status: string, evaluationResult?: string) {
+    const res = await api.patch<ApiResponse<FollowUp>>(`/follow-ups/${id}/status`, null, {
+      params: { status, evaluationResult },
+    });
+    return res.data.data;
+  },
+};
+
+export const emergencyContactService = {
+  async getAll(search?: string): Promise<EmergencyContact[]> {
+    const res = await api.get<ApiResponse<EmergencyContact[]>>('/emergency-contacts', {
+      params: search ? { search } : undefined,
+    });
+    return res.data.data || [];
+  },
+
+  async create(data: {
+    studentId: number;
+    contactName: string;
+    relationship: string;
+    phoneNumber: string;
+    address?: string;
+  }) {
+    const res = await api.post<ApiResponse<any>>('/emergency-contacts', data);
     return res.data.data;
   },
 };
 
 export const dashboardService = {
-  getOverview: async (): Promise<import('../types').DashboardOverview> => {
-    const res = await api.get('/dashboard/overview');
+  async getOverview(): Promise<DashboardOverview> {
+    const res = await api.get<ApiResponse<DashboardOverview>>('/dashboard/overview');
     return res.data.data;
   },
 };
 
 export const reportService = {
-  downloadAttendanceReport: async (eventId?: number, startDate?: string, endDate?: string): Promise<Blob> => {
-    const res = await api.get('/reports/attendance', {
-      params: { eventId, startDate, endDate },
-      responseType: 'blob',
-    });
-    return res.data;
-  },
-  downloadViolationReport: async (startDate?: string, endDate?: string): Promise<Blob> => {
-    const res = await api.get('/reports/violations', {
-      params: { startDate, endDate },
-      responseType: 'blob',
-    });
-    return res.data;
-  },
-  downloadStudentReport: async (): Promise<Blob> => {
-    const res = await api.get('/reports/students', { responseType: 'blob' });
-    return res.data;
-  },
-};
-
-export const userService = {
-  getAll: async (): Promise<import('../types').User[]> => {
-    const res = await api.get('/users');
-    return res.data.data;
-  },
-  create: async (data: Partial<import('../types').User> & { password: string }): Promise<import('../types').User> => {
-    const roleStr = String(data.role || 'STAFF');
-    const normalizedRole = roleStr.startsWith('ROLE_') ? roleStr : `ROLE_${roleStr}`;
-    const res = await api.post('/users', { ...data, role: normalizedRole });
-    return res.data.data;
-  },
-  update: async (id: number, data: Partial<import('../types').User>): Promise<import('../types').User> => {
-    const res = await api.put(`/users/${id}`, data);
-    return res.data.data;
-  },
-  toggleEnabled: async (id: number): Promise<void> => {
-    await api.patch(`/users/${id}/toggle-status`);
-  },
-};
-
-export const residenceService = {
-  getAll: async (): Promise<import('../types').ResidenceCategory[]> => {
-    const res = await api.get('/residence-categories');
-    return res.data.data;
-  },
-  update: async (id: number, data: Partial<import('../types').ResidenceCategory>): Promise<import('../types').ResidenceCategory> => {
-    const res = await api.put(`/residence-categories/${id}`, data);
-    return res.data.data;
+  async downloadExcel(type: 'students' | 'predictions' | 'follow-ups' | 'welfare' | 'pdf-archive') {
+    const res = await api.get(`/reports/${type}`, { responseType: 'blob' });
+    return res.data as Blob;
   },
 };

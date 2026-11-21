@@ -1,40 +1,21 @@
-// ============================================================
-// StudentInsight – TypeScript Types & Interfaces
-// ============================================================
+export type Role = 'USER';
 
-export type Role = 'ADMIN' | 'STAFF' | 'VILLAGE_DEAN' | 'ROLE_ADMIN' | 'ROLE_STAFF' | 'ROLE_VILLAGE_DEAN';
-export type ResidenceType = 'OUTSIDER_DEKAT' | 'OUTSIDER_JAUH';
-export type StudentStatus = 'ACTIVE' | 'INACTIVE' | 'GRADUATED' | 'DROPPED_OUT';
-export type EventType = 'FRIDAY_VESPER' | 'SABBATH_MORNING' | 'SABBATH_AFTERNOON' | 'WOP_MORNING' | 'WOP_EVENING' | 'WOP_CULMINATION';
-export type EventStatus = 'SCHEDULED' | 'ONGOING' | 'COMPLETED' | 'CANCELLED';
-export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'EXCUSED' | 'SICK' | 'PENDING_VERIFICATION';
-export type AttendanceMethod = 'QR_SCAN' | 'MANUAL' | 'SYSTEM';
-export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';
-export type WelfareStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
-export type WelfareCategory = 'HEALTH' | 'FINANCIAL' | 'ACADEMIC' | 'SOCIAL' | 'OTHER';
-
-// ── Auth ────────────────────────────────────────────────────
 export interface AuthUser {
   id: number;
   username: string;
   email: string;
   fullName: string;
   role: Role;
-  enabled?: boolean;
+  active?: boolean;
 }
 
-export interface LoginRequest {
-  username: string;
-  password: string;
+export interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
+  timestamp?: string;
 }
 
-export interface LoginResponse {
-  accessToken: string;
-  tokenType: string;
-  user: AuthUser;
-}
-
-// ── Pagination ───────────────────────────────────────────────
 export interface PageResponse<T> {
   content: T[];
   totalElements: number;
@@ -43,209 +24,239 @@ export interface PageResponse<T> {
   number: number;
 }
 
-// ── Residence Category ───────────────────────────────────────
 export interface ResidenceCategory {
   id: number;
   code: string;
   name: string;
-  description: string;
-  maxDistanceMeters: number;
+  maxDistanceMeters?: number;
+  description?: string;
   active: boolean;
 }
 
-// ── Emergency Contact ─────────────────────────────────────────
 export interface EmergencyContact {
   id: number;
   contactName: string;
   relationship: string;
   phoneNumber: string;
   address?: string;
+  studentId?: number;
+  studentNim?: string;
+  studentName?: string;
+  studyProgram?: string;
+  latestSabbathPoints?: number;
+  riskCategory?: string;
+  currentAddress?: string;
 }
 
-// ── Student ───────────────────────────────────────────────────
 export interface Student {
   id: number;
   nim: string;
+  firstName?: string;
+  lastName?: string;
   fullName: string;
-  programStudy: string;
+  studyProgram: string;
+  faculty: string;
   phoneNumber?: string;
-  residenceCategoryId: number;
-  residenceCategoryName: string;
-  residenceAddress?: string;
-  status: StudentStatus;
-  qrToken: string;
+  residenceCategory?: ResidenceCategory | null;
+  currentAddress?: string;
+  status: string;
   totalViolationPoints: number;
+  latestSabbathPoints: number;
+  previousSabbathPoints?: number | null;
+  pointsDelta: number;
+  riskCategory: 'SAFE' | 'LOW' | 'MEDIUM' | 'HIGH' | string;
+  projectedEndPoints?: number | null;
   emergencyContacts?: EmergencyContact[];
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
 }
 
-// ── Worship Event ─────────────────────────────────────────────
-export interface WorshipEvent {
+export interface StudentPointHistoryItem {
   id: number;
-  title: string;
-  eventType: EventType;
-  eventDate: string;
-  startTime: string;
-  endTime?: string;
-  location?: string;
-  description?: string;
-  status: EventStatus;
-  mandatoryForCategories: string[];
-  totalPresent: number;
-  totalExpected: number;
-  createdAt: string;
+  pdfReportId: number;
+  fileName: string;
+  reportDate: string;
+  periodLabel: string;
+  sabbathPoints: number;
+  pointsDelta: number;
+  riskCategory: string;
+  projectedEndPoints?: number;
+  percentileRank?: number;
 }
 
-// ── Attendance Rule ───────────────────────────────────────────
-export interface AttendanceRule {
+export interface PdfReportSummary {
   id: number;
-  residenceCategoryId: number;
-  residenceCategoryName: string;
-  eventType: EventType;
-  isMandatory: boolean;
-  violationPoints: number;
-  description?: string;
-}
-
-// ── Attendance ────────────────────────────────────────────────
-export interface Attendance {
-  id: number;
-  studentId: number;
-  studentNim: string;
-  studentName: string;
-  worshipEventId: number;
-  worshipEventTitle: string;
-  status: AttendanceStatus;
-  method: AttendanceMethod;
-  scannedAt?: string;
-  notes?: string;
-  verifiedBy?: string;
-  residenceCategoryName: string;
-}
-
-// ── Violation Point ───────────────────────────────────────────
-export interface ViolationPoint {
-  id: number;
-  studentId: number;
-  studentNim: string;
-  studentName: string;
-  worshipEventId?: number;
-  worshipEventTitle?: string;
-  points: number;
-  reason: string;
-  isManualAdjustment: boolean;
-  adjustedBy?: string;
+  fileName: string;
+  facultyName: string;
+  reportDate: string;
+  periodLabel: string;
+  totalStudents: number;
+  zeroPointStudents: number;
+  studentsWithPoints: number;
+  maxPoints: number;
+  avgPoints: number;
   notes?: string;
   createdAt: string;
 }
 
-export interface ViolationPointRule {
-  id: number;
-  residenceCategoryId: number;
-  residenceCategoryName: string;
-  eventType: EventType;
-  pointsPerAbsence: number;
-  isDemoData: boolean;
+export interface PdfPreviewRecord {
+  row_number: number;
+  nim: string;
+  last_name: string;
+  first_name: string;
+  full_name: string;
+  study_program: string;
+  sabbath_points: number;
 }
 
-// ── ML Prediction ─────────────────────────────────────────────
-export interface StudentPrediction {
-  studentId: number;
-  studentNim: string;
-  studentName: string;
-  residenceCategoryName?: string;
-  residenceCategory?: string;
-  riskLevel?: RiskLevel;
-  riskCategory?: RiskLevel;
-  riskScore?: number;
-  probLow?: number;
-  probMedium?: number;
-  probHigh?: number;
-  modelName?: string;
-  modelVersion?: string;
-  totalAttendances?: number;
-  totalAbsences?: number;
-  absenceRate?: number;
-  totalViolationPoints: number;
-  consecutiveAbsences?: number;
-  predictionNote?: string;
-  predictedAt: string;
+export interface PdfPreviewResponse {
+  file_name: string;
+  detected_faculty: string;
+  total_pages: number;
+  total_rows: number;
+  zero_point_count: number;
+  with_point_count: number;
+  max_points: number;
+  avg_points: number;
+  median_points: number;
+  prodi_summary: Array<{
+    study_program: string;
+    total_students: number;
+    zero_point_students: number;
+    students_with_points: number;
+    avg_points: number;
+    max_points: number;
+  }>;
+  warnings: string[];
+  records: PdfPreviewRecord[];
+}
+
+export interface SemesterSetting {
+  id?: number;
+  semesterName: string;
+  semesterStartDate: string;
+  attendanceCutoffDate: string;
+  semesterEndDate: string;
+  finalPointLimit?: number | null;
+  attendanceClosed: boolean;
+  daysRemainingUntilCutoff?: number;
+  semesterProgressPercent?: number;
+  updatedAt?: string;
 }
 
 export interface PredictionSummary {
-  totalStudents: number;
-  highRisk: number;
-  mediumRisk: number;
-  lowRisk: number;
-  modelAccuracy?: number;
-  lastUpdated: string;
+  totalPredicted: number;
+  safeCount: number;
+  lowRiskCount: number;
+  mediumRiskCount: number;
+  highRiskCount: number;
+  safePercentage: number;
+  lowRiskPercentage: number;
+  mediumRiskPercentage: number;
+  highRiskPercentage: number;
+  exceedsFinalLimitCount: number;
+  analysisMode: string;
+  modelName: string;
+  latestReportDate?: string | null;
+  attendanceCutoffDate?: string | null;
+  finalPointLimit?: number | null;
+  attendanceClosed: boolean;
+  clusterRanges: Record<string, { min: number; max: number }>;
 }
 
-// ── Welfare Report ────────────────────────────────────────────
+export interface StudentPrediction {
+  id: number;
+  studentId: number;
+  studentNim: string;
+  studentName: string;
+  studyProgram: string;
+  faculty?: string;
+  residenceCategory?: string | null;
+  currentPoints: number;
+  pointsDelta: number;
+  projectedEndPoints?: number | null;
+  percentileRank: number;
+  riskCategory: 'SAFE' | 'LOW' | 'MEDIUM' | 'HIGH' | string;
+  probLow: number;
+  probMedium: number;
+  probHigh: number;
+  modelName: string;
+  modelVersion: string;
+  analysisMode: string;
+  exceedsFinalLimit: boolean;
+  hasEmergencyContact: boolean;
+  predictedAt: string;
+}
+
 export interface WelfareReport {
   id: number;
   studentId: number;
-  studentName: string;
   studentNim: string;
-  category: WelfareCategory;
-  title: string;
+  studentName: string;
+  reportType: string;
+  priority: string;
+  status: string;
   description: string;
-  status: WelfareStatus;
-  reportedBy: string;
-  resolvedBy?: string;
-  resolvedAt?: string;
-  resolution?: string;
+  reportedByName?: string;
+  assignedToName?: string;
+  resolutionNotes?: string;
   createdAt: string;
 }
 
-// ── Follow-Up Record ─────────────────────────────────────────
 export interface FollowUp {
   id: number;
   studentId: number;
-  studentName: string;
   studentNim: string;
-  notes: string;
-  followUpType: string;
-  followUpDate: string;
-  conductedBy: string;
-  outcome?: string;
-  nextActionRequired: boolean;
+  studentName: string;
+  conductedByUserName?: string;
+  counselingDate: string;
+  topicsDiscussed: string;
+  actionPlan: string;
+  status: string;
+  evaluationResult?: string;
   createdAt: string;
 }
 
-// ── User ───────────────────────────────────────────────────────
-export interface User {
-  id: number;
-  username: string;
-  email: string;
-  fullName: string;
-  role: Role;
-  enabled: boolean;
-  createdAt: string;
-}
-
-// ── Dashboard ─────────────────────────────────────────────────
 export interface DashboardOverview {
   totalStudents: number;
-  totalOutsiderDekat: number;
-  totalOutsiderJauh: number;
-  totalEventsThisMonth: number;
-  totalPresentToday: number;
-  totalAbsentToday: number;
-  highRiskStudents: number;
+  zeroPointStudents: number;
+  studentsWithPoints: number;
+  maxPoints: number;
+  avgPoints: number;
+  medianPoints: number;
+  totalPdfReports: number;
   openWelfareReports: number;
-  recentAttendanceRate: number;
-  topViolators: { studentName: string; nim: string; points: number }[];
-  attendanceTrend: { date: string; present: number; absent: number }[];
-  riskDistribution: { level: string; count: number }[];
-  eventTypeDistribution: { type: string; count: number }[];
-}
-
-// ── API Generic Response ──────────────────────────────────────
-export interface ApiResponse<T> {
-  success: boolean;
-  message: string;
-  data: T;
-  timestamp: string;
+  activeFollowUps: number;
+  emergencyContactsCount: number;
+  latestPdfReport?: PdfReportSummary | null;
+  semesterSetting?: SemesterSetting | null;
+  predictionSummary?: PredictionSummary | null;
+  prodiBreakdown: Array<{
+    studyProgram: string;
+    totalStudents: number;
+    zeroPointStudents: number;
+    studentsWithPoints: number;
+    highRiskCount: number;
+    avgPoints: number;
+    maxPoints: number;
+  }>;
+  pointDistribution: Record<string, number>;
+  snapshotTrend: Array<{
+    reportId: number;
+    reportDate: string;
+    periodLabel: string;
+    totalStudents: number;
+    studentsWithPoints: number;
+    avgPoints: number;
+    maxPoints: number;
+  }>;
+  priorityStudents: Student[];
+  recentActivities: Array<{
+    id: string;
+    type: 'WELFARE' | 'FOLLOW_UP';
+    studentId: number;
+    studentName: string;
+    subtitle: string;
+    status: string;
+    createdAt: string;
+  }>;
 }

@@ -1,14 +1,15 @@
 package com.studentinsight;
 
 import com.studentinsight.audit.AuditLogService;
-import com.studentinsight.common.BadRequestException;
+import com.studentinsight.common.ResourceNotFoundException;
+import com.studentinsight.emergency.EmergencyContactRepository;
 import com.studentinsight.residence.ResidenceCategory;
 import com.studentinsight.residence.ResidenceCategoryRepository;
 import com.studentinsight.student.Student;
 import com.studentinsight.student.StudentRepository;
 import com.studentinsight.student.StudentService;
-import com.studentinsight.student.dto.CreateStudentRequest;
 import com.studentinsight.student.dto.StudentDTO;
+import com.studentinsight.student.dto.UpdateStudentRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,6 +33,9 @@ class StudentServiceTest {
     private ResidenceCategoryRepository residenceCategoryRepository;
 
     @Mock
+    private EmergencyContactRepository emergencyContactRepository;
+
+    @Mock
     private AuditLogService auditLogService;
 
     @InjectMocks
@@ -49,40 +53,47 @@ class StudentServiceTest {
     }
 
     @Test
-    void createStudent_Success() {
-        CreateStudentRequest req = new CreateStudentRequest();
-        req.setNim("105022119999");
-        req.setFullName("Test Student");
-        req.setStudyProgram("Informatika");
-        req.setFaculty("FIK");
+    void updateStudent_CompletesResidenceAndAddress() {
+        Student existing = Student.builder()
+                .id(10L)
+                .nim("S22310477")
+                .fullName("Rivanda Elva Lumatau")
+                .studyProgram("Sistem Informasi")
+                .faculty("Fakultas Ilmu Komputer")
+                .latestSabbathPoints(196)
+                .riskCategory("HIGH")
+                .status("ACTIVE")
+                .build();
+
+        UpdateStudentRequest req = new UpdateStudentRequest();
+        req.setFullName("Rivanda Elva Lumatau");
+        req.setStudyProgram("Sistem Informasi");
+        req.setFaculty("Fakultas Ilmu Komputer");
         req.setResidenceCategoryId(1L);
-        req.setCurrentAddress("Airmadidi");
+        req.setCurrentAddress("Kost Filadelfia, Airmadidi");
+        req.setPhoneNumber("081234567890");
+        req.setStatus("ACTIVE");
 
-        when(studentRepository.existsByNim("105022119999")).thenReturn(false);
+        when(studentRepository.findById(10L)).thenReturn(Optional.of(existing));
         when(residenceCategoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory));
-        when(studentRepository.save(any(Student.class))).thenAnswer(invocation -> {
-            Student s = invocation.getArgument(0);
-            s.setId(99L);
-            return s;
-        });
+        when(studentRepository.save(any(Student.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        StudentDTO result = studentService.createStudent(req);
+        StudentDTO result = studentService.updateStudent(10L, req);
 
         assertNotNull(result);
-        assertEquals("105022119999", result.getNim());
-        assertNotNull(result.getQrToken());
-        assertTrue(result.getQrToken().startsWith("QR-STU-"));
+        assertEquals("OUTSIDER_DEKAT", result.getResidenceCategory().getCode());
+        assertEquals("Kost Filadelfia, Airmadidi", result.getCurrentAddress());
         verify(studentRepository, times(1)).save(any(Student.class));
     }
 
     @Test
-    void createStudent_DuplicateNim_ThrowsBadRequest() {
-        CreateStudentRequest req = new CreateStudentRequest();
-        req.setNim("105022119999");
+    void updateStudent_MissingId_ThrowsNotFound() {
+        UpdateStudentRequest req = new UpdateStudentRequest();
+        req.setFullName("Test");
+        req.setStudyProgram("Informatika");
+        req.setFaculty("FIK");
 
-        when(studentRepository.existsByNim("105022119999")).thenReturn(true);
-
-        assertThrows(BadRequestException.class, () -> studentService.createStudent(req));
-        verify(studentRepository, never()).save(any(Student.class));
+        when(studentRepository.findById(999L)).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> studentService.updateStudent(999L, req));
     }
 }

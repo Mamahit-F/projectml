@@ -8,6 +8,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateLocalUser: (u: AuthUser) => void;
   isAuthenticated: boolean;
 }
 
@@ -23,10 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       const parsed = JSON.parse(stored);
       if (parsed && typeof parsed === 'object') {
-        if (parsed.role) {
-          parsed.role = parsed.role.replace(/^ROLE_/, '');
-        }
-        return parsed;
+        return { ...parsed, role: 'USER' };
       }
       return null;
     } catch {
@@ -74,8 +72,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const updateLocalUser = useCallback((u: AuthUser) => {
+    localStorage.setItem('si_user', JSON.stringify(u));
+    setUser(u);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout, isAuthenticated: !!token && !!user }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        isLoading,
+        login,
+        logout,
+        updateLocalUser,
+        isAuthenticated: !!token && !!user,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

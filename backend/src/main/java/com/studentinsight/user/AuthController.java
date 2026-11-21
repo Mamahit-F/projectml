@@ -4,6 +4,7 @@ import com.studentinsight.common.ApiResponse;
 import com.studentinsight.config.JwtTokenProvider;
 import com.studentinsight.user.dto.LoginRequest;
 import com.studentinsight.user.dto.LoginResponse;
+import com.studentinsight.user.dto.UpdateUserRequest;
 import com.studentinsight.user.dto.UserDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -50,18 +51,28 @@ public class AuthController {
                 .role(user.getRole())
                 .build();
 
-        return ResponseEntity.ok(ApiResponse.ok("Login successful", loginResponse));
+        return ResponseEntity.ok(ApiResponse.ok("Berhasil masuk ke sistem", loginResponse));
     }
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserDTO>> getCurrentUser(Authentication authentication) {
         UserDTO user = userService.getUserByUsername(authentication.getName());
-        return ResponseEntity.ok(ApiResponse.ok("Current user profile retrieved", user));
+        return ResponseEntity.ok(ApiResponse.ok("Profil pengguna dimuat", user));
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<ApiResponse<UserDTO>> updateProfile(
+            Authentication authentication,
+            @RequestBody UpdateUserRequest request) {
+        UserDTO current = userService.getUserByUsername(authentication.getName());
+        request.setRole(Role.ROLE_USER);
+        UserDTO updated = userService.updateUser(current.getId(), request);
+        return ResponseEntity.ok(ApiResponse.ok("Profil akun berhasil diperbarui", updated));
     }
 
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout() {
         SecurityContextHolder.clearContext();
-        return ResponseEntity.ok(ApiResponse.ok("Logout successful", null));
+        return ResponseEntity.ok(ApiResponse.ok("Berhasil keluar", null));
     }
 }

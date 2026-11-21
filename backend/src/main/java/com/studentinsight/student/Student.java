@@ -28,6 +28,12 @@ public class Student {
     @Column(nullable = false, unique = true, length = 20)
     private String nim;
 
+    @Column(name = "first_name", length = 150)
+    private String firstName;
+
+    @Column(name = "last_name", length = 100)
+    private String lastName;
+
     @Column(name = "full_name", nullable = false, length = 150)
     private String fullName;
 
@@ -41,22 +47,40 @@ public class Student {
     private String phoneNumber;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "residence_category_id", nullable = false)
+    @JoinColumn(name = "residence_category_id")
     private ResidenceCategory residenceCategory;
 
-    @Column(name = "current_address", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "current_address", columnDefinition = "TEXT")
     private String currentAddress;
 
     @Column(nullable = false, length = 30)
     @Builder.Default
     private String status = "ACTIVE"; // ACTIVE, INACTIVE, PROBATION, GRADUATED
 
-    @Column(name = "qr_token", nullable = false, unique = true, length = 64)
+    @Column(name = "qr_token", unique = true, length = 64)
     private String qrToken;
 
     @Column(name = "total_violation_points", nullable = false)
     @Builder.Default
     private Integer totalViolationPoints = 0;
+
+    @Column(name = "latest_sabbath_points", nullable = false)
+    @Builder.Default
+    private Integer latestSabbathPoints = 0;
+
+    @Column(name = "previous_sabbath_points")
+    private Integer previousSabbathPoints;
+
+    @Column(name = "points_delta", nullable = false)
+    @Builder.Default
+    private Integer pointsDelta = 0;
+
+    @Column(name = "risk_category", nullable = false, length = 20)
+    @Builder.Default
+    private String riskCategory = "SAFE"; // SAFE, LOW, MEDIUM, HIGH
+
+    @Column(name = "projected_end_points")
+    private Double projectedEndPoints;
 
     @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference

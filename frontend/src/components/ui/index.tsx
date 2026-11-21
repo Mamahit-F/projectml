@@ -1,216 +1,312 @@
-import React from 'react';
-import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react';
-import type { Toast } from '../../hooks/useToast';
+import React, { useEffect, useRef, useState } from 'react';
+import { Loader2, X, Search, Check } from 'lucide-react';
+import { studentService } from '../../services/studentService';
+import type { Student } from '../../types';
 
-// ── Toast Component ───────────────────────────────────────────
-const icons = { success: CheckCircle, error: XCircle, warning: AlertTriangle, info: Info };
-const colors = {
-  success: 'bg-green-50 border-green-400 text-green-800',
-  error:   'bg-red-50 border-red-400 text-red-800',
-  warning: 'bg-yellow-50 border-yellow-400 text-yellow-800',
-  info:    'bg-blue-50 border-blue-400 text-blue-800',
-};
-const iconColors = { success: 'text-green-500', error: 'text-red-500', warning: 'text-yellow-500', info: 'text-blue-500' };
-
-export const ToastItem: React.FC<{ toast: Toast; onRemove: (id: string) => void }> = ({ toast, onRemove }) => {
-  const Icon = icons[toast.type];
-  return (
-    <div className={`flex items-start gap-3 p-4 border rounded-lg shadow-lg ${colors[toast.type]} min-w-[300px] max-w-[400px]`}>
-      <Icon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${iconColors[toast.type]}`} />
-      <div className="flex-1">
-        <p className="font-semibold text-sm">{toast.title}</p>
-        {toast.message && <p className="text-xs mt-1 opacity-80">{toast.message}</p>}
-      </div>
-      <button onClick={() => onRemove(toast.id)} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
-    </div>
-  );
-};
-
-export const ToastContainer: React.FC<{ toasts: Toast[]; onRemove: (id: string) => void }> = ({ toasts, onRemove }) => (
-  <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
-    {toasts.map((t) => <ToastItem key={t.id} toast={t} onRemove={onRemove} />)}
-  </div>
-);
-
-// ── Button ────────────────────────────────────────────────────
-type BtnVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
-const btnStyles: Record<BtnVariant, string> = {
-  primary:   'bg-indigo-600 hover:bg-indigo-700 text-white',
-  secondary: 'bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-300',
-  danger:    'bg-red-600 hover:bg-red-700 text-white',
-  ghost:     'hover:bg-gray-100 text-gray-600',
-};
-
+// --- Button (Obsidian & Coral Finexy/Jobgio Style) ---
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: BtnVariant;
+  variant?: 'primary' | 'coral' | 'secondary' | 'danger' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   icon?: React.ReactNode;
 }
+
 export const Button: React.FC<ButtonProps> = ({
-  variant = 'primary', size = 'md', loading, icon, children, className = '', disabled, ...props
+  children,
+  variant = 'primary',
+  size = 'md',
+  loading = false,
+  icon,
+  className = '',
+  disabled,
+  ...props
 }) => {
-  const sizeClass = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' }[size];
+  const variants = {
+    primary: 'bg-obsidian text-white hover:bg-obsidian-hover shadow-sm',
+    coral: 'bg-coral-gradient text-white hover:opacity-95 shadow-coral',
+    secondary: 'bg-white text-obsidian border border-[#E5E7EB] hover:bg-[#F7F8FA]',
+    danger: 'bg-red-600 text-white hover:bg-red-700',
+    ghost: 'bg-transparent text-slate-600 hover:bg-[#F2F4F7] hover:text-obsidian',
+  };
+  const sizes = {
+    sm: 'px-3.5 py-1.5 text-xs gap-1.5',
+    md: 'px-4 py-2.5 text-xs font-semibold gap-2',
+    lg: 'px-5 py-3 text-sm font-semibold gap-2',
+  };
+
   return (
     <button
-      {...props}
       disabled={disabled || loading}
-      className={`inline-flex items-center gap-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${btnStyles[variant]} ${sizeClass} ${className}`}
+      className={`inline-flex items-center justify-center font-semibold rounded-full transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
+      {...props}
     >
-      {loading ? <Spinner size="sm" /> : icon}
+      {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : icon}
       {children}
     </button>
   );
 };
 
-// ── Spinner ───────────────────────────────────────────────────
-export const Spinner: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }) => {
-  const s = { sm: 'w-4 h-4', md: 'w-6 h-6', lg: 'w-8 h-8' }[size];
-  return <div className={`${s} border-2 border-current border-t-transparent rounded-full animate-spin`} />;
+// --- Risk Badge (Finexy dot-indicator pill style) ---
+export const RiskBadge: React.FC<{ risk?: string; size?: 'sm' | 'md' }> = ({ risk = 'SAFE', size = 'sm' }) => {
+  const key = (risk || 'SAFE').toUpperCase();
+  const styles: Record<string, { bg: string; dot: string; label: string }> = {
+    SAFE: { bg: 'bg-emerald-50 text-emerald-700 border-emerald-200/70', dot: 'bg-emerald-500', label: 'Aman (0 Poin)' },
+    LOW: { bg: 'bg-sky-50 text-sky-700 border-sky-200/70', dot: 'bg-sky-500', label: 'Risiko Rendah' },
+    MEDIUM: { bg: 'bg-amber-50 text-amber-700 border-amber-200/70', dot: 'bg-amber-500', label: 'Risiko Sedang' },
+    HIGH: { bg: 'bg-coral-50 text-coral-700 border-coral-200/80', dot: 'bg-coral-500', label: 'Risiko Tinggi' },
+  };
+  const cfg = styles[key] || styles.SAFE;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border font-semibold whitespace-nowrap ${
+        size === 'sm' ? 'px-2.5 py-0.5 text-[11px]' : 'px-3 py-1 text-xs'
+      } ${cfg.bg}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+      {cfg.label}
+    </span>
+  );
 };
 
-// ── Badge ─────────────────────────────────────────────────────
-type BadgeColor = 'green' | 'red' | 'yellow' | 'blue' | 'purple' | 'gray' | 'orange';
-const badgeColors: Record<BadgeColor, string> = {
-  green:  'bg-green-100 text-green-800',
-  red:    'bg-red-100 text-red-800',
-  yellow: 'bg-yellow-100 text-yellow-800',
-  blue:   'bg-blue-100 text-blue-800',
-  purple: 'bg-purple-100 text-purple-800',
-  gray:   'bg-gray-100 text-gray-700',
-  orange: 'bg-orange-100 text-orange-800',
+// --- Generic Pill Badge ---
+export const Badge: React.FC<{
+  children: React.ReactNode;
+  color?: 'slate' | 'green' | 'amber' | 'red' | 'blue' | 'coral' | 'dark';
+  dot?: boolean;
+}> = ({ children, color = 'slate', dot = false }) => {
+  const map = {
+    slate: { cls: 'bg-[#F2F4F7] text-slate-700', dot: 'bg-slate-400' },
+    green: { cls: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
+    amber: { cls: 'bg-amber-50 text-amber-700', dot: 'bg-amber-500' },
+    red: { cls: 'bg-red-50 text-red-700', dot: 'bg-red-500' },
+    blue: { cls: 'bg-sky-50 text-sky-700', dot: 'bg-sky-500' },
+    coral: { cls: 'bg-coral-50 text-coral-600', dot: 'bg-coral-500' },
+    dark: { cls: 'bg-obsidian text-white', dot: 'bg-coral-400' },
+  };
+  const c = map[color];
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap ${c.cls}`}>
+      {dot && <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />}
+      {children}
+    </span>
+  );
 };
-export const Badge: React.FC<{ color?: BadgeColor; children: React.ReactNode; className?: string }> = ({
-  color = 'gray', children, className = ''
-}) => (
-  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeColors[color]} ${className}`}>
-    {children}
-  </span>
+
+// --- Input ---
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: string;
+}
+
+export const Input: React.FC<InputProps> = ({ label, className = '', ...props }) => (
+  <div>
+    {label && <label className="block text-xs font-semibold text-slate-700 mb-1.5">{label}</label>}
+    <input
+      className={`w-full px-3.5 py-2.5 text-xs bg-[#F7F8FA] border border-[#E6E8EE] rounded-2xl text-obsidian placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-obsidian/15 focus:border-obsidian transition ${className}`}
+      {...props}
+    />
+  </div>
 );
 
-// ── Modal ─────────────────────────────────────────────────────
-export const Modal: React.FC<{
-  open: boolean; onClose: () => void; title: string; children: React.ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl';
-}> = ({ open, onClose, title, children, size = 'md' }) => {
+// --- Select ---
+interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  label?: string;
+  options: { value: string | number; label: string }[];
+}
+
+export const Select: React.FC<SelectProps> = ({ label, options, className = '', ...props }) => (
+  <div>
+    {label && <label className="block text-xs font-semibold text-slate-700 mb-1.5">{label}</label>}
+    <select
+      className={`w-full px-3.5 py-2.5 text-xs bg-[#F7F8FA] border border-[#E6E8EE] rounded-2xl text-obsidian focus:outline-none focus:bg-white focus:ring-2 focus:ring-obsidian/15 focus:border-obsidian transition ${className}`}
+      {...props}
+    >
+      {options.map((opt) => (
+        <option key={String(opt.value)} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+
+// --- Textarea ---
+interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label?: string;
+}
+
+export const Textarea: React.FC<TextareaProps> = ({ label, className = '', ...props }) => (
+  <div>
+    {label && <label className="block text-xs font-semibold text-slate-700 mb-1.5">{label}</label>}
+    <textarea
+      className={`w-full px-3.5 py-2.5 text-xs bg-[#F7F8FA] border border-[#E6E8EE] rounded-2xl text-obsidian placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-obsidian/15 focus:border-obsidian transition ${className}`}
+      {...props}
+    />
+  </div>
+);
+
+// --- Modal ---
+interface ModalProps {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  subtitle?: string;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  children: React.ReactNode;
+}
+
+export const Modal: React.FC<ModalProps> = ({ open, onClose, title, subtitle, size = 'md', children }) => {
   if (!open) return null;
-  const widths = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-2xl', xl: 'max-w-4xl' };
+  const maxW = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }[size];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className={`relative bg-white rounded-xl shadow-2xl w-full ${widths[size]} m-4 max-h-[90vh] flex flex-col`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-obsidian/40 backdrop-blur-xs">
+      <div className={`bg-white w-full ${maxW} rounded-3xl shadow-2xl border border-[#ECEEF2] overflow-hidden max-h-[90vh] flex flex-col`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#F0F1F4]">
+          <div>
+            <h3 className="text-base font-bold text-obsidian">{title}</h3>
+            {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-[#F4F5F7] hover:bg-[#E5E7EB] text-slate-600 flex items-center justify-center transition"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-        <div className="overflow-y-auto flex-1 px-6 py-4">{children}</div>
+        <div className="p-6 overflow-y-auto">{children}</div>
       </div>
     </div>
   );
 };
 
-// ── StatCard ──────────────────────────────────────────────────
-export const StatCard: React.FC<{
-  title: string; value: string | number; icon: React.ReactNode;
-  color?: string; subtitle?: string; trend?: { value: number; label: string };
-}> = ({ title, value, icon, color = 'indigo', subtitle, trend }) => (
-  <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium text-gray-500">{title}</p>
-        <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
-        {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
-        {trend && (
-          <p className={`text-xs mt-1 ${trend.value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {trend.value >= 0 ? '↑' : '↓'} {Math.abs(trend.value)}% {trend.label}
-          </p>
-        )}
+// --- Loading & Empty States ---
+export const LoadingState: React.FC<{ message?: string }> = ({ message = 'Memuat data...' }) => (
+  <div className="flex flex-col items-center justify-center py-14 text-slate-400 gap-2.5">
+    <Loader2 className="w-6 h-6 animate-spin text-coral-500" />
+    <span className="text-xs font-medium">{message}</span>
+  </div>
+);
+
+export const EmptyState: React.FC<{ message: string; action?: React.ReactNode }> = ({ message, action }) => (
+  <div className="flex flex-col items-center justify-center py-12 px-6 text-center gap-3">
+    <div className="w-12 h-12 rounded-full bg-[#F4F5F7] flex items-center justify-center text-slate-400">
+      <Search className="w-5 h-5" />
+    </div>
+    <p className="text-xs font-medium text-slate-500 max-w-sm">{message}</p>
+    {action}
+  </div>
+);
+
+// --- Live Searchable Student Picker (handles 621+ / 1000+ students effortlessly) ---
+interface StudentSearchSelectProps {
+  label?: string;
+  value: number | null;
+  onChange: (studentId: number, student: Student) => void;
+  placeholder?: string;
+}
+
+export const StudentSearchSelect: React.FC<StudentSearchSelectProps> = ({
+  label = 'Cari & Pilih Mahasiswa',
+  value,
+  onChange,
+  placeholder = 'Ketik Nama atau Nomor Registrasi (NIM)...',
+}) => {
+  const [query, setQuery] = useState('');
+  const [options, setOptions] = useState<Student[]>([]);
+  const [selected, setSelected] = useState<Student | null>(null);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await studentService.getAll({
+          search: query || undefined,
+          size: 15,
+          sortBy: 'latestSabbathPoints',
+          direction: 'desc',
+        });
+        setOptions(res.content || []);
+      } catch {
+        setOptions([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    if (value && (!selected || selected.id !== value)) {
+      studentService.getById(value).then(setSelected).catch(() => {});
+    }
+  }, [value]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      {label && <label className="block text-xs font-semibold text-slate-700 mb-1.5">{label}</label>}
+      <div className="relative">
+        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-3" />
+        <input
+          type="text"
+          value={open ? query : selected ? `${selected.fullName} (${selected.nim})` : query}
+          onFocus={() => {
+            setOpen(true);
+            setQuery('');
+          }}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          placeholder={placeholder}
+          className="w-full pl-9 pr-3.5 py-2.5 text-xs bg-[#F7F8FA] border border-[#E6E8EE] rounded-2xl text-obsidian placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-obsidian/15 focus:border-obsidian transition"
+        />
       </div>
-      <div className={`p-3 rounded-xl bg-${color}-100 text-${color}-600`}>{icon}</div>
+
+      {open && (
+        <div className="absolute z-40 mt-1.5 w-full bg-white rounded-2xl border border-[#E6E8EE] shadow-xl max-h-60 overflow-y-auto p-1.5">
+          {loading ? (
+            <div className="py-4 text-center text-xs text-slate-400">Mencari mahasiswa...</div>
+          ) : options.length === 0 ? (
+            <div className="py-4 text-center text-xs text-slate-400">Mahasiswa tidak ditemukan.</div>
+          ) : (
+            options.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  setSelected(s);
+                  onChange(s.id, s);
+                  setOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between gap-2 text-xs transition ${
+                  value === s.id ? 'bg-obsidian text-white' : 'hover:bg-[#F4F5F7] text-obsidian'
+                }`}
+              >
+                <div className="min-w-0">
+                  <p className="font-semibold truncate">{s.fullName}</p>
+                  <p className={`text-[10px] ${value === s.id ? 'text-slate-300' : 'text-slate-500'}`}>
+                    {s.nim} • {s.studyProgram} • {s.latestSabbathPoints} Poin
+                  </p>
+                </div>
+                {value === s.id && <Check className="w-3.5 h-3.5 shrink-0 text-coral-400" />}
+              </button>
+            ))
+          )}
+        </div>
+      )}
     </div>
-  </div>
-);
-
-// ── Empty State ───────────────────────────────────────────────
-export const EmptyState: React.FC<{ message?: string; icon?: React.ReactNode }> = ({
-  message = 'Tidak ada data', icon
-}) => (
-  <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-    {icon || <Info className="w-12 h-12 mb-3 opacity-40" />}
-    <p className="text-sm">{message}</p>
-  </div>
-);
-
-// ── Loading State ─────────────────────────────────────────────
-export const LoadingState: React.FC = () => (
-  <div className="flex items-center justify-center py-16">
-    <Spinner size="lg" />
-  </div>
-);
-
-// ── Input ─────────────────────────────────────────────────────
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label?: string; error?: string; helper?: string;
-}
-export const Input: React.FC<InputProps> = ({ label, error, helper, className = '', ...props }) => (
-  <div className="flex flex-col gap-1">
-    {label && <label className="text-sm font-medium text-gray-700">{label}</label>}
-    <input
-      {...props}
-      className={`border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-        error ? 'border-red-400' : 'border-gray-300'
-      } ${className}`}
-    />
-    {error && <p className="text-xs text-red-500">{error}</p>}
-    {helper && !error && <p className="text-xs text-gray-400">{helper}</p>}
-  </div>
-);
-
-// ── Select ────────────────────────────────────────────────────
-interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  label?: string; error?: string; options: { value: string | number; label: string }[];
-}
-export const Select: React.FC<SelectProps> = ({ label, error, options, className = '', ...props }) => (
-  <div className="flex flex-col gap-1">
-    {label && <label className="text-sm font-medium text-gray-700">{label}</label>}
-    <select
-      {...props}
-      className={`border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white ${
-        error ? 'border-red-400' : 'border-gray-300'
-      } ${className}`}
-    >
-      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-    {error && <p className="text-xs text-red-500">{error}</p>}
-  </div>
-);
-
-// ── Textarea ──────────────────────────────────────────────────
-interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
-  label?: string; error?: string;
-}
-export const Textarea: React.FC<TextareaProps> = ({ label, error, className = '', ...props }) => (
-  <div className="flex flex-col gap-1">
-    {label && <label className="text-sm font-medium text-gray-700">{label}</label>}
-    <textarea
-      {...props}
-      className={`border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-        error ? 'border-red-400' : 'border-gray-300'
-      } ${className}`}
-    />
-    {error && <p className="text-xs text-red-500">{error}</p>}
-  </div>
-);
-
-// ── Confirm Dialog ────────────────────────────────────────────
-export const ConfirmDialog: React.FC<{
-  open: boolean; title: string; message: string;
-  onConfirm: () => void; onCancel: () => void; confirmLabel?: string; danger?: boolean;
-}> = ({ open, title, message, onConfirm, onCancel, confirmLabel = 'Ya, Lanjutkan', danger }) => (
-  <Modal open={open} onClose={onCancel} title={title} size="sm">
-    <p className="text-sm text-gray-600 mb-6">{message}</p>
-    <div className="flex gap-3 justify-end">
-      <Button variant="secondary" onClick={onCancel}>Batal</Button>
-      <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm}>{confirmLabel}</Button>
-    </div>
-  </Modal>
-);
+  );
+};

@@ -1,40 +1,46 @@
 import React, { useEffect, useState } from 'react';
-import { HeartHandshake, Plus, CheckCircle, Clock, AlertCircle, Eye, Shield } from 'lucide-react';
-import { welfareService, studentService } from '../../services';
-import type { WelfareReport, Student } from '../../types';
-import { Button, LoadingState, EmptyState, Modal, Input, Select, Textarea, Badge } from '../../components/ui';
+import { useNavigate } from 'react-router-dom';
+import { Plus, CheckCircle2, ArrowUpRight } from 'lucide-react';
+import { welfareService } from '../../services';
+import type { WelfareReport } from '../../types';
+import {
+  Button,
+  LoadingState,
+  EmptyState,
+  Modal,
+  Select,
+  Textarea,
+  Badge,
+  StudentSearchSelect,
+} from '../../components/ui';
 
 export const WelfareList: React.FC = () => {
+  const navigate = useNavigate();
   const [reports, setReports] = useState<WelfareReport[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
 
-  // Create Modal
+  // Create modal
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedStudentId, setSelectedStudentId] = useState<number>(1);
-  const [reportType, setReportType] = useState<string>('HEALTH');
-  const [priority, setPriority] = useState<string>('MEDIUM');
+  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [reportType, setReportType] = useState('HOUSING');
+  const [priority, setPriority] = useState('MEDIUM');
   const [description, setDescription] = useState('');
   const [creating, setCreating] = useState(false);
 
-  // Detail / Resolve Modal
-  const [viewingReport, setViewingReport] = useState<any | null>(null);
+  // Resolve modal
+  const [viewingReport, setViewingReport] = useState<WelfareReport | null>(null);
+  const [nextStatus, setNextStatus] = useState('RESOLVED');
   const [resolutionText, setResolutionText] = useState('');
   const [resolving, setResolving] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [wRes, sRes] = await Promise.all([
-        welfareService.getAll({ status: statusFilter, size: 20 }),
-        studentService.getAll({ size: 50 }).then((r) => r.content).catch(() => []),
-      ]);
-      setReports(wRes.content || []);
-      setStudents(sRes);
-      if (sRes.length > 0) setSelectedStudentId(sRes[0].id);
-    } catch (err) {
-      console.error(err);
+      const res = await welfareService.getAll({ status: statusFilter, size: 50 });
+      setReports(res.content || []);
+    } catch {
+      setReports([]);
     } finally {
       setLoading(false);
     }
@@ -46,6 +52,10 @@ export const WelfareList: React.FC = () => {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedStudentId) {
+      alert('Silakan pilih mahasiswa terlebih dahulu.');
+      return;
+    }
     setCreating(true);
     try {
       await welfareService.create({
@@ -53,11 +63,12 @@ export const WelfareList: React.FC = () => {
         reportType,
         priority,
         description,
-      } as any);
+      });
       setIsCreateOpen(false);
+      setSelectedStudentId(null);
       setDescription('');
       fetchData();
-    } catch (err) {
+    } catch {
       alert('Gagal membuat laporan kesejahteraan.');
     } finally {
       setCreating(false);
@@ -69,114 +80,152 @@ export const WelfareList: React.FC = () => {
     setResolving(true);
     try {
       await welfareService.update(viewingReport.id, {
-        status: 'RESOLVED',
+        status: nextStatus,
         resolutionNotes: resolutionText,
-      } as any);
+      });
       setViewingReport(null);
       setResolutionText('');
       fetchData();
-    } catch (err) {
-      alert('Gagal menyelesaikan laporan.');
+    } catch {
+      alert('Gagal memperbarui status laporan.');
     } finally {
       setResolving(false);
     }
   };
 
+  const typeLabel: Record<string, string> = {
+    HOUSING: 'Tempat Tinggal / Kos',
+    SECURITY: 'Keamanan Lingkungan',
+    HEALTH: 'Kesehatan',
+    FINANCIAL: 'Finansial / Ekonomi',
+    GENERAL_AID: 'Bantuan Umum',
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Laporan Bantuan & Kesejahteraan Mahasiswa</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Pencatatan kondisi kesehatan, kendala tempat tinggal, ekonomi, dan keselamatan mahasiswa outsider
+          <h1 className="text-2xl font-extrabold tracking-tight text-obsidian">
+            Laporan Kesejahteraan & Keamanan
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Pilar Kesejahteraan & Keamanan • Pencatatan kendala kos, kesehatan, finansial, dan keselamatan mahasiswa di luar asrama
           </p>
         </div>
-        <Button
-          icon={<Plus className="w-4 h-4" />}
-          className="bg-emerald-700 hover:bg-emerald-800 text-white"
-          onClick={() => setIsCreateOpen(true)}
-        >
+        <Button variant="coral" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setIsCreateOpen(true)}>
           Buat Laporan Kasus
         </Button>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Filter Pills */}
       <div className="flex flex-wrap gap-2">
-        {['SEMUA', 'OPEN', 'IN_REVIEW', 'RESOLVED', 'CLOSED'].map((st) => (
-          <Button
-            key={st}
-            size="sm"
-            variant={(!statusFilter && st === 'SEMUA') || statusFilter === st ? 'primary' : 'secondary'}
-            onClick={() => setStatusFilter(st === 'SEMUA' ? undefined : st)}
+        {[
+          { id: undefined, label: 'Semua Status' },
+          { id: 'OPEN', label: 'Terbuka (Open)' },
+          { id: 'IN_REVIEW', label: 'Dalam Penanganan' },
+          { id: 'RESOLVED', label: 'Terselesaikan' },
+          { id: 'CLOSED', label: 'Ditutup' },
+        ].map((st) => (
+          <button
+            key={String(st.id)}
+            onClick={() => setStatusFilter(st.id)}
+            className={`px-4 py-2 rounded-full text-xs font-semibold transition ${
+              statusFilter === st.id
+                ? 'bg-obsidian text-white shadow-sm'
+                : 'bg-white border border-[#ECEEF2] text-slate-600 hover:bg-[#F7F8FA]'
+            }`}
           >
-            {st}
-          </Button>
+            {st.label}
+          </button>
         ))}
       </div>
 
-      {/* Reports List */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
+      {/* List Card */}
+      <div className="bg-white rounded-3xl border border-[#ECEEF2] shadow-card p-6">
         {loading ? (
           <LoadingState />
         ) : reports.length === 0 ? (
-          <EmptyState message="Tidak ada laporan bantuan / kesejahteraan untuk filter ini." />
+          <EmptyState message="Belum ada laporan kesejahteraan atau keamanan pada status ini." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider">
-                <tr>
-                  <th className="py-3 px-3 font-semibold">Tanggal</th>
-                  <th className="py-3 px-3 font-semibold">Mahasiswa</th>
-                  <th className="py-3 px-3 font-semibold">Kategori & Prioritas</th>
-                  <th className="py-3 px-3 font-semibold">Deskripsi Masalah</th>
-                  <th className="py-3 px-3 font-semibold text-center">Status</th>
-                  <th className="py-3 px-3 font-semibold text-right">Aksi</th>
+            <table className="w-full text-left border-separate border-spacing-y-2">
+              <thead>
+                <tr className="text-[11px] font-semibold text-slate-400">
+                  <th className="px-3 pb-1">Mahasiswa</th>
+                  <th className="px-3 pb-1">Kategori & Prioritas</th>
+                  <th className="px-3 pb-1">Deskripsi Kasus</th>
+                  <th className="px-3 pb-1 text-center">Status</th>
+                  <th className="px-3 pb-1 text-right">Aksi</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {reports.map((r: any) => (
-                  <tr key={r.id} className="hover:bg-slate-50/70 transition">
-                    <td className="py-3 px-3 text-slate-500 whitespace-nowrap">
-                      {new Date(r.createdAt).toLocaleDateString('id-ID')}
+              <tbody>
+                {reports.map((w) => (
+                  <tr key={w.id} className="bg-[#F8F9FB] hover:bg-[#F0F2F6] transition">
+                    <td className="px-3.5 py-3.5 rounded-l-2xl">
+                      <button
+                        onClick={() => navigate(`/students/${w.studentId}`)}
+                        className="text-left group"
+                      >
+                        <p className="text-xs font-bold text-obsidian group-hover:text-coral-600 inline-flex items-center gap-1">
+                          {w.studentName} <ArrowUpRight className="w-3 h-3" />
+                        </p>
+                        <p className="text-[11px] text-slate-400 font-mono">{w.studentNim}</p>
+                      </button>
                     </td>
-                    <td className="py-3 px-3">
-                      <p className="font-semibold text-slate-900">{r.studentName}</p>
-                      <p className="text-[10px] text-slate-400 font-mono">{r.studentNim}</p>
+                    <td className="px-3 py-3.5 space-y-1">
+                      <div>
+                        <Badge color="dark">{typeLabel[w.reportType] || w.reportType}</Badge>
+                      </div>
+                      <div>
+                        <Badge
+                          color={
+                            w.priority === 'URGENT'
+                              ? 'red'
+                              : w.priority === 'HIGH'
+                              ? 'coral'
+                              : w.priority === 'MEDIUM'
+                              ? 'amber'
+                              : 'slate'
+                          }
+                        >
+                          Prioritas: {w.priority}
+                        </Badge>
+                      </div>
                     </td>
-                    <td className="py-3 px-3 whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
-                        {r.reportType || r.category}
-                      </span>
-                      {r.priority && (
-                        <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                          r.priority === 'HIGH' || r.priority === 'URGENT' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
-                        }`}>
-                          {r.priority}
-                        </span>
+                    <td className="px-3 py-3.5 max-w-md">
+                      <p className="text-xs text-obsidian font-medium">{w.description}</p>
+                      {w.resolutionNotes && (
+                        <p className="text-[11px] text-emerald-700 mt-1 font-medium">
+                          Penanganan: {w.resolutionNotes}
+                        </p>
                       )}
                     </td>
-                    <td className="py-3 px-3 font-medium text-slate-800 max-w-[260px] truncate">
-                      {r.title || r.description}
-                    </td>
-                    <td className="py-3 px-3 text-center whitespace-nowrap">
-                      <Badge color={
-                        r.status === 'RESOLVED' || r.status === 'CLOSED' ? 'green' :
-                        r.status === 'OPEN' ? 'red' : 'yellow'
-                      }>
-                        {r.status}
+                    <td className="px-3 py-3.5 text-center">
+                      <Badge
+                        color={
+                          w.status === 'RESOLVED' || w.status === 'CLOSED'
+                            ? 'green'
+                            : w.status === 'OPEN'
+                            ? 'coral'
+                            : 'amber'
+                        }
+                        dot
+                      >
+                        {w.status}
                       </Badge>
                     </td>
-                    <td className="py-3 px-3 text-right whitespace-nowrap">
+                    <td className="px-3.5 py-3.5 rounded-r-2xl text-right whitespace-nowrap">
                       <Button
                         size="sm"
                         variant="secondary"
-                        icon={<Eye className="w-3.5 h-3.5" />}
+                        icon={<CheckCircle2 className="w-3.5 h-3.5" />}
                         onClick={() => {
-                          setViewingReport(r);
-                          setResolutionText(r.resolutionNotes || r.resolution || '');
+                          setViewingReport(w);
+                          setNextStatus(w.status === 'OPEN' ? 'IN_REVIEW' : 'RESOLVED');
+                          setResolutionText(w.resolutionNotes || '');
                         }}
                       >
-                        Detail
+                        Tindak Lanjut
                       </Button>
                     </td>
                   </tr>
@@ -188,98 +237,85 @@ export const WelfareList: React.FC = () => {
       </div>
 
       {/* Create Modal */}
-      <Modal open={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Buat Laporan Bantuan & Kesejahteraan">
+      <Modal open={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Buat Laporan Kesejahteraan / Keamanan">
         <form onSubmit={handleCreateSubmit} className="space-y-4">
-          <Select
-            label="Pilih Mahasiswa Terkait"
-            required
+          <StudentSearchSelect
+            label="Cari & Pilih Mahasiswa"
             value={selectedStudentId}
-            onChange={(e) => setSelectedStudentId(Number(e.target.value))}
-            options={students.map((s) => ({ value: s.id, label: `${s.fullName} (${s.nim})` }))}
+            onChange={(id) => setSelectedStudentId(id)}
           />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Select
-              label="Kategori Permasalahan"
-              required
+              label="Jenis Kendala"
               value={reportType}
               onChange={(e) => setReportType(e.target.value)}
               options={[
-                { value: 'HEALTH', label: 'Kesehatan / Sakit Rawat' },
-                { value: 'HOUSING', label: 'Tempat Tinggal / Indekos' },
-                { value: 'FINANCIAL', label: 'Kendala Finansial / Makanan' },
-                { value: 'SECURITY', label: 'Keamanan & Keselamatan' },
-                { value: 'GENERAL_AID', label: 'Bantuan Umum Lainnya' },
+                { value: 'HOUSING', label: 'Tempat Tinggal / Kos' },
+                { value: 'SECURITY', label: 'Keamanan Lingkungan' },
+                { value: 'HEALTH', label: 'Kesehatan' },
+                { value: 'FINANCIAL', label: 'Finansial / Ekonomi' },
+                { value: 'GENERAL_AID', label: 'Bantuan Umum' },
               ]}
             />
             <Select
-              label="Prioritas"
-              required
+              label="Tingkat Prioritas"
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
               options={[
-                { value: 'LOW', label: 'LOW' },
-                { value: 'MEDIUM', label: 'MEDIUM' },
-                { value: 'HIGH', label: 'HIGH' },
-                { value: 'URGENT', label: 'URGENT' },
+                { value: 'LOW', label: 'Rendah' },
+                { value: 'MEDIUM', label: 'Sedang' },
+                { value: 'HIGH', label: 'Tinggi' },
+                { value: 'URGENT', label: 'Mendesak (Urgent)' },
               ]}
             />
           </div>
-
           <Textarea
-            label="Deskripsi Lengkap Kondisi & Kebutuhan Bantuan"
+            label="Deskripsi Kondisi / Kendala"
             required
             rows={3}
-            placeholder="Jelaskan kondisi mahasiswa, kebutuhan mendesak, atau tindakan darurat yang telah diambil..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            placeholder="Jelaskan kendala keamanan, kos, kesehatan, atau bantuan yang dibutuhkan..."
           />
-
-          <div className="flex justify-end gap-2 pt-3">
+          <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setIsCreateOpen(false)}>Batal</Button>
-            <Button type="submit" loading={creating} className="bg-emerald-700 hover:bg-emerald-800 text-white">
-              Kirim Laporan
-            </Button>
+            <Button type="submit" variant="coral" loading={creating}>Simpan Laporan</Button>
           </div>
         </form>
       </Modal>
 
-      {/* Detail / Resolve Modal */}
-      <Modal open={!!viewingReport} onClose={() => setViewingReport(null)} title="Detail & Penanganan Laporan Kesejahteraan">
-        {viewingReport && (
-          <div className="space-y-4 text-xs">
-            <div className="p-3 bg-slate-50 rounded-xl">
-              <p className="font-bold text-sm text-slate-900">
-                {viewingReport.reportType || viewingReport.category} {viewingReport.priority ? `(${viewingReport.priority})` : ''}
-              </p>
-              <p className="text-slate-500 mt-1 font-mono">
-                Mahasiswa: {viewingReport.studentName} ({viewingReport.studentNim}) • Status: {viewingReport.status}
-              </p>
-              <p className="mt-3 text-slate-700 leading-relaxed text-xs">{viewingReport.description}</p>
-            </div>
-
-            <Textarea
-              label="Catatan Tindak Lanjut / Solusi (Village Dean)"
-              rows={3}
-              placeholder="Catatan bantuan yang telah diberikan (misal: dirujuk ke poliklinik, dibawakan ransum, dikontak orang tua)..."
-              value={resolutionText}
-              onChange={(e) => setResolutionText(e.target.value)}
-            />
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="secondary" onClick={() => setViewingReport(null)}>Tutup</Button>
-              {viewingReport.status !== 'RESOLVED' && (
-                <Button
-                  onClick={handleResolveSubmit}
-                  loading={resolving}
-                  className="bg-emerald-700 hover:bg-emerald-800 text-white"
-                >
-                  Tandai Selesai / Ditangani (RESOLVED)
-                </Button>
-              )}
-            </div>
+      {/* Update Status Modal */}
+      <Modal
+        open={!!viewingReport}
+        onClose={() => setViewingReport(null)}
+        title="Tindak Lanjut Kasus Kesejahteraan"
+        subtitle={viewingReport ? `${viewingReport.studentName} (${viewingReport.studentNim})` : ''}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <Select
+            label="Perbarui Status Kasus"
+            value={nextStatus}
+            onChange={(e) => setNextStatus(e.target.value)}
+            options={[
+              { value: 'OPEN', label: 'Terbuka (Open)' },
+              { value: 'IN_REVIEW', label: 'Sedang Ditangani (In Review)' },
+              { value: 'RESOLVED', label: 'Selesai Ditangani (Resolved)' },
+              { value: 'CLOSED', label: 'Ditutup (Closed)' },
+            ]}
+          />
+          <Textarea
+            label="Catatan Tindakan / Penyelesaian"
+            rows={3}
+            value={resolutionText}
+            onChange={(e) => setResolutionText(e.target.value)}
+            placeholder="Catat bantuan yang telah diberikan atau hasil kunjungan kos..."
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setViewingReport(null)}>Batal</Button>
+            <Button variant="primary" loading={resolving} onClick={handleResolveSubmit}>Simpan Status</Button>
           </div>
-        )}
+        </div>
       </Modal>
     </div>
   );

@@ -63,14 +63,14 @@ public class FollowUpService {
         Student student = studentRepository.findById(request.getStudentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Student", "id", request.getStudentId()));
 
-        User deanUser = getCurrentUser();
-        if (deanUser == null) {
-            deanUser = userRepository.findByUsername("dean").orElseGet(() -> userRepository.findAll().get(0));
+        User activeUser = getCurrentUser();
+        if (activeUser == null) {
+            activeUser = userRepository.findByUsername("user").orElseGet(() -> userRepository.findAll().get(0));
         }
 
         FollowUpRecord record = FollowUpRecord.builder()
                 .student(student)
-                .conductedByUser(deanUser)
+                .conductedByUser(activeUser)
                 .counselingDate(request.getCounselingDate())
                 .topicsDiscussed(request.getTopicsDiscussed())
                 .actionPlan(request.getActionPlan())

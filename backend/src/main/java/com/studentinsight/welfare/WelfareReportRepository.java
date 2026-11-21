@@ -15,9 +15,9 @@ public interface WelfareReportRepository extends JpaRepository<WelfareReport, Lo
     List<WelfareReport> findByStatus(String status);
 
     @Query("SELECT r FROM WelfareReport r WHERE " +
-           "(:status IS NULL OR r.status = :status) AND " +
-           "(:priority IS NULL OR r.priority = :priority) AND " +
-           "(:reportType IS NULL OR r.reportType = :reportType) " +
+           "(:status IS NULL OR CAST(:status AS string) = '' OR r.status = CAST(:status AS string)) AND " +
+           "(:priority IS NULL OR CAST(:priority AS string) = '' OR r.priority = CAST(:priority AS string)) AND " +
+           "(:reportType IS NULL OR CAST(:reportType AS string) = '' OR r.reportType = CAST(:reportType AS string)) " +
            "ORDER BY r.createdAt DESC")
     Page<WelfareReport> searchReports(@Param("status") String status,
                                       @Param("priority") String priority,

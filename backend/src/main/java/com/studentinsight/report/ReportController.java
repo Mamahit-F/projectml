@@ -1,202 +1,288 @@
 package com.studentinsight.report;
 
-import com.studentinsight.attendance.Attendance;
-import com.studentinsight.attendance.AttendanceRepository;
-import com.studentinsight.attendance.dto.AttendanceDTO;
-import com.studentinsight.common.ApiResponse;
+import com.studentinsight.followup.FollowUpRecord;
 import com.studentinsight.followup.FollowUpRecordRepository;
-import com.studentinsight.followup.dto.FollowUpDTO;
-import com.studentinsight.prediction.MLPredictionRepository;
+import com.studentinsight.pdfreport.PdfReport;
+import com.studentinsight.pdfreport.PdfReportRepository;
+import com.studentinsight.prediction.MLPredictionService;
 import com.studentinsight.prediction.dto.StudentPredictionDTO;
 import com.studentinsight.student.Student;
 import com.studentinsight.student.StudentRepository;
-import com.studentinsight.student.dto.StudentDTO;
-import com.studentinsight.violation.ViolationPoint;
-import com.studentinsight.violation.ViolationPointRepository;
-import com.studentinsight.violation.dto.ViolationPointDTO;
+import com.studentinsight.welfare.WelfareReport;
 import com.studentinsight.welfare.WelfareReportRepository;
-import com.studentinsight.welfare.dto.WelfareReportDTO;
 import lombok.RequiredArgsConstructor;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
+import java.io.IOException;
 import java.time.ZoneId;
-import java.util.HashMap;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/reports")
 @RequiredArgsConstructor
 public class ReportController {
 
+    private static final MediaType XLSX_MEDIA_TYPE =
+            MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    private static final DateTimeFormatter DATE_TIME_FMT = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm");
+
     private final StudentRepository studentRepository;
-    private final AttendanceRepository attendanceRepository;
-    private final ViolationPointRepository violationPointRepository;
-    private final WelfareReportRepository welfareReportRepository;
+    private final MLPredictionService predictionService;
     private final FollowUpRecordRepository followUpRepository;
-    private final MLPredictionRepository mlPredictionRepository;
-
-    @GetMapping("/comprehensive")
-    @Transactional(readOnly = true)
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getComprehensiveReport(
-            @RequestParam(required = false) Long residenceCategoryId) {
-
-        Map<String, Object> report = new HashMap<>();
-
-        List<Student> students = (residenceCategoryId != null) ?
-                studentRepository.findByResidenceCategoryId(residenceCategoryId) : studentRepository.findAll();
-
-        List<StudentDTO> studentDTOs = students.stream().map(StudentDTO::fromEntity).collect(Collectors.toList());
-        report.put("students", studentDTOs);
-        report.put("totalStudents", students.size());
-
-        List<AttendanceDTO> attendances = attendanceRepository.findAll().stream()
-                .filter(a -> residenceCategoryId == null ||
-                        (a.getStudent().getResidenceCategory() != null && a.getStudent().getResidenceCategory().getId().equals(residenceCategoryId)))
-                .map(AttendanceDTO::fromEntity)
-                .collect(Collectors.toList());
-        report.put("attendances", attendances);
-
-        List<ViolationPointDTO> violations = violationPointRepository.findAll().stream()
-                .filter(v -> residenceCategoryId == null ||
-                        (v.getStudent().getResidenceCategory() != null && v.getStudent().getResidenceCategory().getId().equals(residenceCategoryId)))
-                .map(ViolationPointDTO::fromEntity)
-                .collect(Collectors.toList());
-        report.put("violations", violations);
-
-        List<WelfareReportDTO> welfareReports = welfareReportRepository.findAll().stream()
-                .filter(w -> residenceCategoryId == null ||
-                        (w.getStudent().getResidenceCategory() != null && w.getStudent().getResidenceCategory().getId().equals(residenceCategoryId)))
-                .map(WelfareReportDTO::fromEntity)
-                .collect(Collectors.toList());
-        report.put("welfareReports", welfareReports);
-
-        List<FollowUpDTO> followUps = followUpRepository.findAll().stream()
-                .filter(f -> residenceCategoryId == null ||
-                        (f.getStudent().getResidenceCategory() != null && f.getStudent().getResidenceCategory().getId().equals(residenceCategoryId)))
-                .map(FollowUpDTO::fromEntity)
-                .collect(Collectors.toList());
-        report.put("followUps", followUps);
-
-        List<StudentPredictionDTO> predictions = mlPredictionRepository.findLatestPredictionsForAllStudents().stream()
-                .filter(p -> residenceCategoryId == null ||
-                        (p.getStudent().getResidenceCategory() != null && p.getStudent().getResidenceCategory().getId().equals(residenceCategoryId)))
-                .map(StudentPredictionDTO::fromEntity)
-                .collect(Collectors.toList());
-        report.put("predictions", predictions);
-
-        return ResponseEntity.ok(ApiResponse.ok("Comprehensive report generated successfully", report));
-    }
-
-    @GetMapping("/attendance")
-    @Transactional(readOnly = true)
-    public ResponseEntity<byte[]> exportAttendanceCsv(
-            @RequestParam(required = false) Long eventId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-
-        List<Attendance> list = (eventId != null)
-                ? attendanceRepository.findByWorshipEventId(eventId)
-                : attendanceRepository.findAll();
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("ID,NIM,Nama Mahasiswa,Kategori,Kegiatan Ibadah,Tanggal,Status,Metode,Waktu Check-In,Catatan\n");
-
-        for (Attendance a : list) {
-            LocalDate eventDate = a.getWorshipEvent() != null ? a.getWorshipEvent().getEventDate() : null;
-            if (startDate != null && (eventDate == null || eventDate.isBefore(startDate))) continue;
-            if (endDate != null && (eventDate == null || eventDate.isAfter(endDate))) continue;
-
-            sb.append(a.getId()).append(',')
-              .append(csv(a.getStudent() != null ? a.getStudent().getNim() : "")).append(',')
-              .append(csv(a.getStudent() != null ? a.getStudent().getFullName() : "")).append(',')
-              .append(csv(a.getStudent() != null && a.getStudent().getResidenceCategory() != null ? a.getStudent().getResidenceCategory().getName() : "")).append(',')
-              .append(csv(a.getWorshipEvent() != null ? a.getWorshipEvent().getTitle() : "")).append(',')
-              .append(csv(eventDate != null ? eventDate.toString() : "")).append(',')
-              .append(csv(a.getStatus() != null ? a.getStatus().name() : "")).append(',')
-              .append(csv(a.getRecordedMethod() != null ? a.getRecordedMethod().name() : "")).append(',')
-              .append(csv(a.getCheckInTime() != null ? a.getCheckInTime().toString() : "")).append(',')
-              .append(csv(a.getNotes())).append('\n');
-        }
-        return csvResponse("laporan_presensi.csv", sb.toString());
-    }
-
-    @GetMapping("/violations")
-    @Transactional(readOnly = true)
-    public ResponseEntity<byte[]> exportViolationsCsv(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-
-        List<ViolationPoint> list = violationPointRepository.findAll();
-        StringBuilder sb = new StringBuilder();
-        sb.append("ID,Tanggal,NIM,Nama Mahasiswa,Kegiatan,Poin,Alasan,Status,Penyesuai,Catatan\n");
-
-        for (ViolationPoint v : list) {
-            LocalDate created = v.getCreatedAt() != null
-                    ? v.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate()
-                    : null;
-            if (startDate != null && (created == null || created.isBefore(startDate))) continue;
-            if (endDate != null && (created == null || created.isAfter(endDate))) continue;
-
-            sb.append(v.getId()).append(',')
-              .append(csv(created != null ? created.toString() : "")).append(',')
-              .append(csv(v.getStudent() != null ? v.getStudent().getNim() : "")).append(',')
-              .append(csv(v.getStudent() != null ? v.getStudent().getFullName() : "")).append(',')
-              .append(csv(v.getWorshipEvent() != null ? v.getWorshipEvent().getTitle() : "Penyesuaian Manual")).append(',')
-              .append(v.getPoints()).append(',')
-              .append(csv(v.getReason())).append(',')
-              .append(csv(v.getStatus())).append(',')
-              .append(csv(v.getAdjustedByUser() != null ? v.getAdjustedByUser().getFullName() : "")).append(',')
-              .append(csv(v.getAdjustmentNotes())).append('\n');
-        }
-        return csvResponse("laporan_pelanggaran.csv", sb.toString());
-    }
+    private final WelfareReportRepository welfareReportRepository;
+    private final PdfReportRepository pdfReportRepository;
 
     @GetMapping("/students")
     @Transactional(readOnly = true)
-    public ResponseEntity<byte[]> exportStudentsCsv() {
-        List<Student> list = studentRepository.findAll();
-        StringBuilder sb = new StringBuilder();
-        sb.append("ID,NIM,Nama Lengkap,Program Studi,Fakultas,Kategori,Alamat,No HP,Total Poin,Status,QR Token\n");
+    public ResponseEntity<byte[]> exportStudentsExcel() throws IOException {
+        List<Student> list = studentRepository.findAll().stream()
+                .sorted(Comparator.comparingInt((Student s) -> s.getLatestSabbathPoints() == null ? 0 : s.getLatestSabbathPoints()).reversed())
+                .toList();
 
+        List<String> headers = List.of(
+                "No",
+                "Nomor Registrasi",
+                "Nama Lengkap",
+                "Program Studi",
+                "Fakultas",
+                "Poin Sabat",
+                "Perubahan",
+                "Proyeksi Akhir",
+                "Tingkat Risiko",
+                "Kategori Tempat Tinggal",
+                "Alamat Kos",
+                "Status"
+        );
+
+        List<List<Object>> rows = new ArrayList<>();
+        int no = 1;
         for (Student s : list) {
-            sb.append(s.getId()).append(',')
-              .append(csv(s.getNim())).append(',')
-              .append(csv(s.getFullName())).append(',')
-              .append(csv(s.getStudyProgram())).append(',')
-              .append(csv(s.getFaculty())).append(',')
-              .append(csv(s.getResidenceCategory() != null ? s.getResidenceCategory().getName() : "")).append(',')
-              .append(csv(s.getCurrentAddress())).append(',')
-              .append(csv(s.getPhoneNumber())).append(',')
-              .append(s.getTotalViolationPoints()).append(',')
-              .append(csv(s.getStatus())).append(',')
-              .append(csv(s.getQrToken())).append('\n');
+            rows.add(List.of(
+                    no++,
+                    s.getNim(),
+                    s.getFullName(),
+                    s.getStudyProgram(),
+                    s.getFaculty(),
+                    s.getLatestSabbathPoints() != null ? s.getLatestSabbathPoints() : 0,
+                    s.getPointsDelta() != null ? s.getPointsDelta() : 0,
+                    s.getProjectedEndPoints() != null ? Math.round(s.getProjectedEndPoints() * 10.0) / 10.0 : 0.0,
+                    s.getRiskCategory() != null ? s.getRiskCategory() : "SAFE",
+                    s.getResidenceCategory() != null ? s.getResidenceCategory().getName() : "Belum Dilengkapi",
+                    s.getCurrentAddress() != null ? s.getCurrentAddress() : "-",
+                    s.getStatus() != null ? s.getStatus() : "ACTIVE"
+            ));
         }
-        return csvResponse("laporan_mahasiswa.csv", sb.toString());
+
+        byte[] bytes = ExcelReportBuilder.buildWorkbook(
+                "Rekap Mahasiswa",
+                "STUDENTINSIGHT — REKAPITULASI MAHASISWA & POIN SABAT",
+                "Universitas Klabat (Diurutkan dari Poin Sabat Tertinggi)",
+                headers,
+                rows,
+                8
+        );
+        return excelResponse("rekap_mahasiswa_poin.xlsx", bytes);
     }
 
-    private ResponseEntity<byte[]> csvResponse(String filename, String content) {
-        byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
+    @GetMapping("/predictions")
+    @Transactional(readOnly = true)
+    public ResponseEntity<byte[]> exportPredictionsExcel() throws IOException {
+        List<StudentPredictionDTO> list = predictionService.getAllLatestPredictions(null, null, null);
+
+        List<String> headers = List.of(
+                "No",
+                "Nomor Registrasi",
+                "Nama Lengkap",
+                "Program Studi",
+                "Poin Saat Ini",
+                "Perubahan",
+                "Proyeksi Akhir",
+                "Persentil",
+                "Kategori Risiko",
+                "Peluang Tinggi (%)",
+                "Melewati Batas Final"
+        );
+
+        List<List<Object>> rows = new ArrayList<>();
+        int no = 1;
+        for (StudentPredictionDTO p : list) {
+            double highPct = p.getProbHigh() != null ? Math.round(p.getProbHigh() * 1000.0) / 10.0 : 0.0;
+            rows.add(List.of(
+                    no++,
+                    p.getStudentNim() != null ? p.getStudentNim() : "-",
+                    p.getStudentName() != null ? p.getStudentName() : "-",
+                    p.getStudyProgram() != null ? p.getStudyProgram() : "-",
+                    p.getCurrentPoints() != null ? p.getCurrentPoints() : 0,
+                    p.getPointsDelta() != null ? p.getPointsDelta() : 0,
+                    p.getProjectedEndPoints() != null ? Math.round(p.getProjectedEndPoints() * 10.0) / 10.0 : 0.0,
+                    p.getPercentileRank() != null ? p.getPercentileRank() : 0.0,
+                    p.getRiskCategory() != null ? p.getRiskCategory() : "SAFE",
+                    highPct,
+                    p.isExceedsFinalLimit() ? "YA" : "TIDAK"
+            ));
+        }
+
+        byte[] bytes = ExcelReportBuilder.buildWorkbook(
+                "Deteksi Risiko",
+                "STUDENTINSIGHT — HASIL DETEKSI RISIKO & PROYEKSI AKHIR SEMESTER",
+                "Pengelompokan Klaster Dinamis (Dynamic K-Means Clustering)",
+                headers,
+                rows,
+                8
+        );
+        return excelResponse("rekap_deteksi_risiko.xlsx", bytes);
+    }
+
+    @GetMapping("/follow-ups")
+    @Transactional(readOnly = true)
+    public ResponseEntity<byte[]> exportFollowUpsExcel() throws IOException {
+        List<FollowUpRecord> list = followUpRepository.findAll();
+
+        List<String> headers = List.of(
+                "No",
+                "Tanggal Konseling",
+                "Nomor Registrasi",
+                "Nama Mahasiswa",
+                "Program Studi",
+                "Topik Pembinaan",
+                "Rencana Tindak Lanjut",
+                "Status",
+                "Hasil Evaluasi"
+        );
+
+        List<List<Object>> rows = new ArrayList<>();
+        int no = 1;
+        for (FollowUpRecord f : list) {
+            rows.add(List.of(
+                    no++,
+                    f.getCounselingDate() != null ? f.getCounselingDate().toString() : "-",
+                    f.getStudent() != null ? f.getStudent().getNim() : "-",
+                    f.getStudent() != null ? f.getStudent().getFullName() : "-",
+                    f.getStudent() != null ? f.getStudent().getStudyProgram() : "-",
+                    f.getTopicsDiscussed() != null ? f.getTopicsDiscussed() : "-",
+                    f.getActionPlan() != null ? f.getActionPlan() : "-",
+                    f.getStatus() != null ? f.getStatus() : "-",
+                    f.getEvaluationResult() != null ? f.getEvaluationResult() : "-"
+            ));
+        }
+
+        byte[] bytes = ExcelReportBuilder.buildWorkbook(
+                "Pembinaan",
+                "STUDENTINSIGHT — REKAP PEMBINAAN & KONSELING MAHASISWA",
+                "Pilar Kedisiplinan Universitas Klabat",
+                headers,
+                rows,
+                -1
+        );
+        return excelResponse("rekap_pembinaan_konseling.xlsx", bytes);
+    }
+
+    @GetMapping("/welfare")
+    @Transactional(readOnly = true)
+    public ResponseEntity<byte[]> exportWelfareExcel() throws IOException {
+        List<WelfareReport> list = welfareReportRepository.findAll();
+
+        List<String> headers = List.of(
+                "No",
+                "Tanggal Laporan",
+                "Nomor Registrasi",
+                "Nama Mahasiswa",
+                "Jenis Kendala",
+                "Prioritas",
+                "Status",
+                "Deskripsi Kendala",
+                "Catatan Penyelesaian"
+        );
+
+        List<List<Object>> rows = new ArrayList<>();
+        int no = 1;
+        for (WelfareReport w : list) {
+            String createdStr = w.getCreatedAt() != null
+                    ? w.getCreatedAt().atZone(ZoneId.systemDefault()).format(DATE_TIME_FMT)
+                    : "-";
+            rows.add(List.of(
+                    no++,
+                    createdStr,
+                    w.getStudent() != null ? w.getStudent().getNim() : "-",
+                    w.getStudent() != null ? w.getStudent().getFullName() : "-",
+                    w.getReportType() != null ? w.getReportType() : "-",
+                    w.getPriority() != null ? w.getPriority() : "-",
+                    w.getStatus() != null ? w.getStatus() : "-",
+                    w.getDescription() != null ? w.getDescription() : "-",
+                    w.getResolutionNotes() != null ? w.getResolutionNotes() : "-"
+            ));
+        }
+
+        byte[] bytes = ExcelReportBuilder.buildWorkbook(
+                "Kesejahteraan",
+                "STUDENTINSIGHT — REKAP KESEJAHTERAAN & KEAMANAN MAHASISWA",
+                "Pilar Kesejahteraan & Keamanan di Luar Asrama",
+                headers,
+                rows,
+                -1
+        );
+        return excelResponse("rekap_kesejahteraan_keamanan.xlsx", bytes);
+    }
+
+    @GetMapping("/pdf-archive")
+    @Transactional(readOnly = true)
+    public ResponseEntity<byte[]> exportPdfArchiveExcel() throws IOException {
+        List<PdfReport> list = pdfReportRepository.findAllByOrderByReportDateDescCreatedAtDesc();
+
+        List<String> headers = List.of(
+                "No",
+                "Tanggal Laporan",
+                "Periode",
+                "Fakultas",
+                "Nama File PDF",
+                "Total Mahasiswa",
+                "Tertib (0 Poin)",
+                "Berpoin",
+                "Poin Tertinggi",
+                "Rata-rata Poin"
+        );
+
+        List<List<Object>> rows = new ArrayList<>();
+        int no = 1;
+        for (PdfReport r : list) {
+            rows.add(List.of(
+                    no++,
+                    r.getReportDate() != null ? r.getReportDate().toString() : "-",
+                    r.getPeriodLabel() != null ? r.getPeriodLabel() : "-",
+                    r.getFacultyName() != null ? r.getFacultyName() : "-",
+                    r.getFileName() != null ? r.getFileName() : "-",
+                    r.getTotalStudents() != null ? r.getTotalStudents() : 0,
+                    r.getZeroPointStudents() != null ? r.getZeroPointStudents() : 0,
+                    r.getStudentsWithPoints() != null ? r.getStudentsWithPoints() : 0,
+                    r.getMaxPoints() != null ? r.getMaxPoints() : 0,
+                    r.getAvgPoints() != null ? r.getAvgPoints() : 0.0
+            ));
+        }
+
+        byte[] bytes = ExcelReportBuilder.buildWorkbook(
+                "Arsip PDF",
+                "STUDENTINSIGHT — RINGKASAN ARSIP LAPORAN PDF",
+                "Riwayat Unggahan Laporan Poin Sabat",
+                headers,
+                rows,
+                -1
+        );
+        return excelResponse("arsip_laporan_pdf.xlsx", bytes);
+    }
+
+    private ResponseEntity<byte[]> excelResponse(String filename, byte[] bytes) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .contentType(XLSX_MEDIA_TYPE)
                 .body(bytes);
-    }
-
-    private String csv(String value) {
-        if (value == null) return "";
-        String escaped = value.replace("\"", "\"\"");
-        return "\"" + escaped + "\"";
     }
 }

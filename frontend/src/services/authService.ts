@@ -1,37 +1,56 @@
 import api from './api';
-import type { LoginRequest, LoginResponse, ApiResponse, AuthUser, Role } from '../types';
+import type { ApiResponse, AuthUser } from '../types';
 
 export const authService = {
-  login: async (data: LoginRequest): Promise<LoginResponse> => {
-    const res = await api.post<ApiResponse<any>>('/auth/login', data);
-    const backendData = res.data.data;
-
-    const token = backendData.accessToken || backendData.token;
-    const rawRole = (backendData.user?.role || backendData.role || 'STAFF') as string;
-    const cleanRole = (rawRole.replace(/^ROLE_/, '') || 'STAFF') as Role;
-
-    const user: AuthUser = backendData.user || {
-      id: backendData.id,
-      username: backendData.username,
-      email: backendData.email,
-      fullName: backendData.fullName,
-      role: cleanRole,
-      enabled: backendData.enabled ?? backendData.active ?? true,
+  async login(credentials: { username: string; password: string }) {
+    const res = await api.post<ApiResponse<any>>('/auth/login', credentials);
+    const payload = res.data.data;
+    const accessToken: string = payload?.token || payload?.accessToken;
+    const user: AuthUser = {
+      id: payload.id,
+      username: payload.username,
+      email: payload.email,
+      fullName: payload.fullName,
+      role: 'USER',
     };
+    return { accessToken, user };
+  },
 
+  async me() {
+    const res = await api.get<ApiResponse<any>>('/auth/me');
+    const u = res.data.data;
     return {
-      accessToken: token,
-      tokenType: backendData.tokenType || 'Bearer',
-      user,
+      id: u.id,
+      username: u.username,
+      email: u.email,
+      fullName: u.fullName,
+      role: 'USER' as const,
+      active: u.active,
     };
   },
-  logout: async (): Promise<void> => {
-    await api.post('/auth/logout').catch(() => {});
-    localStorage.removeItem('si_token');
-    localStorage.removeItem('si_user');
+
+  async updateProfile(data: { fullName: string; email: string; newPassword?: string }) {
+    const res = await api.put<ApiResponse<any>>('/auth/profile', {
+      fullName: data.fullName,
+      email: data.email,
+      role: 'ROLE_USER',
+      newPassword: data.newPassword || undefined,
+    });
+    const u = res.data.data;
+    return {
+      id: u.id,
+      username: u.username,
+      email: u.email,
+      fullName: u.fullName,
+      role: 'USER' as const,
+    };
   },
-  getProfile: async () => {
-    const res = await api.get('/auth/me');
-    return res.data.data;
+
+  async logout() {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // ignore
+    }
   },
 };
