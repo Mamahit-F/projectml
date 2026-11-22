@@ -33,4 +33,12 @@ public interface StudentPointRecordRepository extends JpaRepository<StudentPoint
     List<StudentPointRecord> findAllWithReportOrdered();
 
     Optional<StudentPointRecord> findByPdfReportIdAndStudentId(Long pdfReportId, Long studentId);
+
+    @Query("SELECT DISTINCT r.student.id FROM StudentPointRecord r WHERE r.pdfReport.id = :reportId")
+    List<Long> findDistinctStudentIdsByPdfReportId(@Param("reportId") Long reportId);
+
+    @Query("SELECT DISTINCT r.student.id FROM StudentPointRecord r")
+    List<Long> findAllStudentIdsWithRecords();
+
+    void deleteByPdfReportId(Long pdfReportId);
 }

@@ -160,7 +160,7 @@ export const Dashboard: React.FC = () => {
       {/* ROW 1: 3-Column Bento Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
         {/* Card 1 (Left): Total Students Hero + Single Primary Action + Prodi Summary */}
-        <div className="xl:col-span-4 bg-white rounded-3xl border border-[#ECEEF2] shadow-card p-6 flex flex-col justify-between">
+        <div data-guide="dashboard-summary" className="xl:col-span-4 bg-white rounded-3xl border border-[#ECEEF2] shadow-card p-6 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-500">Total Mahasiswa Dipantau</span>
@@ -232,7 +232,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Card 2 (Center): 2x2 Hero Metric Tiles */}
-        <div className="xl:col-span-4 bg-white rounded-3xl border border-[#ECEEF2] shadow-card p-5 grid grid-cols-2 gap-3.5">
+        <div data-guide="dashboard-risk-tiles" className="xl:col-span-4 bg-white rounded-3xl border border-[#ECEEF2] shadow-card p-5 grid grid-cols-2 gap-3.5">
           {/* Highlighted Coral Card */}
           <div
             onClick={() => navigate('/predictions?risk=HIGH')}

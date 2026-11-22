@@ -112,9 +112,11 @@ export const WelfareList: React.FC = () => {
             Pilar Kesejahteraan & Keamanan • Pencatatan kendala kos, kesehatan, finansial, dan keselamatan mahasiswa di luar asrama
           </p>
         </div>
-        <Button variant="coral" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setIsCreateOpen(true)}>
-          Buat Laporan Kasus
-        </Button>
+        <div data-guide="welfare-action">
+          <Button variant="coral" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setIsCreateOpen(true)}>
+            Buat Laporan Kasus
+          </Button>
+        </div>
       </div>
 
       {/* Filter Pills */}

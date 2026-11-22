@@ -66,8 +66,18 @@ public class PdfReportController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteReport(@PathVariable Long id) {
-        pdfReportService.deleteReport(id);
-        return ResponseEntity.ok(ApiResponse.ok("Arsip laporan PDF berhasil dihapus", null));
+    public ResponseEntity<ApiResponse<Map<String, Object>>> deleteReport(@PathVariable Long id) {
+        Map<String, Object> summary = pdfReportService.deleteReport(id);
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Arsip laporan PDF dan data mahasiswa terkait berhasil disinkronkan dan dihapus",
+                summary));
+    }
+
+    @PostMapping("/sync-students")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> syncStudentsWithPdfArchives() {
+        Map<String, Object> summary = pdfReportService.syncStudentsWithPdfArchives();
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Data mahasiswa berhasil disinkronkan dengan arsip laporan PDF yang tersedia",
+                summary));
     }
 }

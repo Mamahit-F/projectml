@@ -3,6 +3,7 @@ package com.studentinsight.pdfreport;
 import com.studentinsight.audit.AuditLogService;
 import com.studentinsight.common.BadRequestException;
 import com.studentinsight.common.ResourceNotFoundException;
+import com.studentinsight.prediction.MLPredictionRepository;
 import com.studentinsight.prediction.MLPredictionService;
 import com.studentinsight.prediction.dto.PredictionSummaryDTO;
 import com.studentinsight.student.Student;
@@ -40,6 +41,7 @@ public class PdfReportService {
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
     private final MLPredictionService predictionService;
+    private final MLPredictionRepository predictionRepository;
     private final AuditLogService auditLogService;
     private final RestTemplate restTemplate;
 
@@ -302,11 +304,167 @@ public class PdfReportService {
     }
 
     @Transactional
-    public void deleteReport(Long id) {
+    public Map<String, Object> deleteReport(Long id) {
         PdfReport report = pdfReportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PdfReport", "id", id));
+        String deletedFileName = report.getFileName();
+
+        // 1. Capture exact students linked to THIS PDF before deleting records
+        List<Long> affectedStudentIds = pointRecordRepository.findDistinctStudentIdsByPdfReportId(id);
+
+        // 2. Remove predictions & point records tied to this PDF, then delete the PDF archive
+        predictionRepository.deleteByPdfReportId(id);
+        pointRecordRepository.deleteByPdfReportId(id);
+        pointRecordRepository.flush();
         pdfReportRepository.delete(report);
-        auditLogService.log("DELETE_PDF_REPORT", "PdfReport", id, report.getFileName(), null, "Deleted PDF report archive");
+        pdfReportRepository.flush();
+
+        // 3. Synchronize ONLY affected students from the deleted PDF:
+        //    - Students who ONLY existed in this PDF -> deleted completely
+        //    - Students who also exist in other remaining PDF(s) -> recalculated from remaining history
+        List<Long> studentIdsToDelete = new ArrayList<>();
+        List<Student> studentsToUpdate = new ArrayList<>();
+        List<StudentPointRecord> recordsToUpdate = new ArrayList<>();
+
+        for (Long studentId : affectedStudentIds) {
+            List<StudentPointRecord> remainingHistory = pointRecordRepository.findHistoryByStudentId(studentId);
+            if (remainingHistory.isEmpty()) {
+                studentIdsToDelete.add(studentId);
+            } else {
+                studentRepository.findById(studentId).ifPresent(student -> {
+                    recalculateStudentFromHistory(student, remainingHistory, recordsToUpdate);
+                    studentsToUpdate.add(student);
+                });
+            }
+        }
+
+        if (!studentIdsToDelete.isEmpty()) {
+            predictionRepository.deleteByStudentIdIn(studentIdsToDelete);
+            predictionRepository.flush();
+            studentRepository.deleteAllById(studentIdsToDelete);
+            studentRepository.flush();
+        }
+
+        if (!recordsToUpdate.isEmpty()) {
+            pointRecordRepository.saveAll(recordsToUpdate);
+        }
+        if (!studentsToUpdate.isEmpty()) {
+            studentRepository.saveAll(studentsToUpdate);
+            studentRepository.flush();
+        }
+
+        // 4. Re-sync dynamic risk analysis on remaining reports (if any remain)
+        Optional<PdfReport> latestRemaining = pdfReportRepository.findFirstByOrderByReportDateDescCreatedAtDesc();
+        long remainingReportsCount = pdfReportRepository.count();
+        if (latestRemaining.isPresent() && studentRepository.countByStatus("ACTIVE") > 0) {
+            predictionService.analyzeAllActiveStudents(latestRemaining.get());
+        }
+
+        auditLogService.log(
+                "DELETE_PDF_REPORT",
+                "PdfReport",
+                id,
+                deletedFileName,
+                "deletedStudents=" + studentIdsToDelete.size() + ", recalculatedStudents=" + studentsToUpdate.size(),
+                "Deleted PDF report archive and synchronized student records");
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("deletedReportId", id);
+        result.put("deletedFileName", deletedFileName);
+        result.put("deletedStudentsCount", studentIdsToDelete.size());
+        result.put("recalculatedStudentsCount", studentsToUpdate.size());
+        result.put("remainingReportsCount", remainingReportsCount);
+        return result;
+    }
+
+    @Transactional
+    public Map<String, Object> syncStudentsWithPdfArchives() {
+        Set<Long> studentIdsInAnyPdf = new HashSet<>(pointRecordRepository.findAllStudentIdsWithRecords());
+        List<Student> allStudents = studentRepository.findAll();
+
+        List<Long> orphanIds = new ArrayList<>();
+        List<Student> studentsToRecalc = new ArrayList<>();
+        List<StudentPointRecord> recordsToUpdate = new ArrayList<>();
+
+        for (Student s : allStudents) {
+            if (!studentIdsInAnyPdf.contains(s.getId())) {
+                orphanIds.add(s.getId());
+            } else {
+                List<StudentPointRecord> hist = pointRecordRepository.findHistoryByStudentId(s.getId());
+                recalculateStudentFromHistory(s, hist, recordsToUpdate);
+                studentsToRecalc.add(s);
+            }
+        }
+
+        if (!orphanIds.isEmpty()) {
+            predictionRepository.deleteByStudentIdIn(orphanIds);
+            predictionRepository.flush();
+            studentRepository.deleteAllById(orphanIds);
+            studentRepository.flush();
+        }
+        if (!recordsToUpdate.isEmpty()) {
+            pointRecordRepository.saveAll(recordsToUpdate);
+        }
+        if (!studentsToRecalc.isEmpty()) {
+            studentRepository.saveAll(studentsToRecalc);
+            studentRepository.flush();
+        }
+
+        Optional<PdfReport> latestRemaining = pdfReportRepository.findFirstByOrderByReportDateDescCreatedAtDesc();
+        if (latestRemaining.isPresent() && !studentsToRecalc.isEmpty()) {
+            predictionService.analyzeAllActiveStudents(latestRemaining.get());
+        }
+
+        auditLogService.log(
+                "SYNC_STUDENTS_WITH_PDF",
+                "Student",
+                null,
+                null,
+                "removedOrphans=" + orphanIds.size() + ", syncedStudents=" + studentsToRecalc.size(),
+                "Synchronized student directory with current PDF archives");
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("removedOrphanStudentsCount", orphanIds.size());
+        result.put("syncedStudentsCount", studentsToRecalc.size());
+        result.put("remainingReportsCount", pdfReportRepository.count());
+        return result;
+    }
+
+    private void recalculateStudentFromHistory(
+            Student student,
+            List<StudentPointRecord> orderedHistory,
+            List<StudentPointRecord> recordsToUpdate) {
+        if (orderedHistory == null || orderedHistory.isEmpty()) {
+            return;
+        }
+        // Recalculate chronological delta along remaining snapshots
+        Integer runningPrev = null;
+        for (StudentPointRecord rec : orderedHistory) {
+            int pts = rec.getSabbathPoints() != null ? rec.getSabbathPoints() : 0;
+            int expectedDelta = runningPrev == null ? 0 : (pts - runningPrev);
+            if (!Objects.equals(rec.getPointsDelta(), expectedDelta)) {
+                rec.setPointsDelta(expectedDelta);
+                recordsToUpdate.add(rec);
+            }
+            runningPrev = pts;
+        }
+
+        StudentPointRecord latest = orderedHistory.get(orderedHistory.size() - 1);
+        StudentPointRecord prev = orderedHistory.size() >= 2 ? orderedHistory.get(orderedHistory.size() - 2) : null;
+
+        int latestPts = latest.getSabbathPoints() != null ? latest.getSabbathPoints() : 0;
+        Integer prevPts = prev != null ? prev.getSabbathPoints() : null;
+        int delta = prevPts != null ? (latestPts - prevPts) : 0;
+
+        student.setLatestSabbathPoints(latestPts);
+        student.setPreviousSabbathPoints(prevPts);
+        student.setPointsDelta(delta);
+        student.setTotalViolationPoints(latestPts);
+        if (latest.getPdfReport() != null && latest.getPdfReport().getFacultyName() != null) {
+            student.setFaculty(latest.getPdfReport().getFacultyName());
+        }
+        student.setRiskCategory(latest.getRiskCategory() != null ? latest.getRiskCategory() : (latestPts == 0 ? "SAFE" : "LOW"));
+        student.setProjectedEndPoints(latest.getProjectedEndPoints());
     }
 
     public Map<String, Object> toReportMap(PdfReport r) {

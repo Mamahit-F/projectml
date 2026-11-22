@@ -84,9 +84,11 @@ export const EmergencyContacts: React.FC = () => {
             Pilar Keamanan • Akses cepat nomor orang tua/wali dan alamat kos mahasiswa di luar asrama
           </p>
         </div>
-        <Button variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setIsOpen(true)}>
-          Tambah Kontak Wali
-        </Button>
+        <div data-guide="emergency-action">
+          <Button variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setIsOpen(true)}>
+            Tambah Kontak Wali
+          </Button>
+        </div>
       </div>
 
       {/* Search Bar */}

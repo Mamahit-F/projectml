@@ -10,6 +10,7 @@ import { StudentList } from './pages/students/StudentList';
 import { StudentDetail } from './pages/students/StudentDetail';
 import { StudentForm } from './pages/students/StudentForm';
 import { PredictionPage } from './pages/prediction/PredictionPage';
+import { MlDashboardPage } from './pages/ml/MlDashboardPage';
 import { FollowUpList } from './pages/followup/FollowUpList';
 import { WelfareList } from './pages/welfare/WelfareList';
 import { EmergencyContacts } from './pages/EmergencyContacts';
@@ -45,6 +46,7 @@ export const App: React.FC = () => {
             <Route path="students/:id" element={<StudentDetail />} />
             <Route path="students/:id/edit" element={<StudentForm />} />
             <Route path="predictions" element={<PredictionPage />} />
+            <Route path="ml-analytics" element={<MlDashboardPage />} />
             <Route path="follow-up" element={<FollowUpList />} />
             <Route path="welfare" element={<WelfareList />} />
             <Route path="emergency-contacts" element={<EmergencyContacts />} />

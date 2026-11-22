@@ -30,6 +30,11 @@ services:
     environment:
       - PORT=8001
       - API_SECRET_KEY=studentinsight-ml-secret-key-2026
+      - HISTORICAL_DATA_DIR=/data/historical
+      - ML_ARTIFACTS_DIR=/app/artifacts
+    volumes:
+      - ../Data Poin Mahasiswa:/data/historical:ro
+      - ./ml-service/artifacts:/app/artifacts
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 10s
@@ -49,6 +54,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
       - ML_SERVICE_URL=http://ml-service:8001
+      - ML_SERVICE_API_KEY=studentinsight-ml-secret-key-2026
       - JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
     depends_on:
       postgres:

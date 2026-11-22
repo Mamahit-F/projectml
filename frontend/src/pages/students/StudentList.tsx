@@ -68,7 +68,7 @@ export const StudentList: React.FC = () => {
       </div>
 
       {/* Filter Card */}
-      <div className="bg-white rounded-3xl border border-[#ECEEF2] shadow-card p-5 flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+      <div data-guide="students-filter" className="bg-white rounded-3xl border border-[#ECEEF2] shadow-card p-5 flex flex-col md:flex-row gap-3 items-stretch md:items-center">
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input

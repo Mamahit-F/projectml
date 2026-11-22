@@ -159,6 +159,7 @@ export const ReportPage: React.FC = () => {
 
       {/* Semester Cutoff & Optional Final Point Limit */}
       <form
+        data-guide="semester-form"
         onSubmit={handleSaveSemester}
         className="bg-white rounded-3xl border border-[#ECEEF2] shadow-card p-6 sm:p-7 space-y-5"
       >

@@ -10,6 +10,7 @@ import {
   Search,
   Calendar,
   UploadCloud,
+  RefreshCw,
 } from 'lucide-react';
 import { pdfReportService } from '../../services';
 import type { PdfPreviewResponse, PdfReportSummary } from '../../types';
@@ -34,6 +35,7 @@ export const PdfUploadPage: React.FC = () => {
 
   const [archives, setArchives] = useState<PdfReportSummary[]>([]);
   const [loadingArchives, setLoadingArchives] = useState(true);
+  const [syncingStudents, setSyncingStudents] = useState(false);
 
   // Archive detail modal
   const [viewingReport, setViewingReport] = useState<PdfReportSummary | null>(null);
@@ -123,12 +125,50 @@ export const PdfUploadPage: React.FC = () => {
   };
 
   const handleDeleteArchive = async (id: number) => {
-    if (!confirm('Hapus arsip laporan PDF ini?')) return;
+    if (
+      !confirm(
+        'Hapus arsip laporan PDF ini? Data mahasiswa yang hanya berasal dari PDF ini juga akan ikut terhapus, dan poin mahasiswa yang juga ada di PDF lain akan otomatis disinkronkan ulang.'
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    setSuccessMsg(null);
     try {
-      await pdfReportService.delete(id);
-      loadArchives();
-    } catch {
-      alert('Gagal menghapus arsip PDF.');
+      const res = await pdfReportService.delete(id);
+      const deletedCount = res?.deletedStudentsCount ?? 0;
+      const recalcCount = res?.recalculatedStudentsCount ?? 0;
+      setSuccessMsg(
+        `Arsip PDF "${res?.deletedFileName || ''}" berhasil dihapus. ${deletedCount} mahasiswa dari PDF ini ikut terhapus` +
+          (recalcCount > 0 ? ` dan ${recalcCount} mahasiswa yang ada di PDF lain telah disinkronkan ulang.` : '.')
+      );
+      await loadArchives();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Gagal menghapus arsip PDF.');
+    }
+  };
+
+  const handleSyncStudents = async () => {
+    if (
+      !confirm(
+        'Sinkronkan seluruh data mahasiswa dengan arsip PDF saat ini? Mahasiswa yang tidak tercatat pada arsip PDF mana pun akan dihapus agar data benar-benar sinkron.'
+      )
+    ) {
+      return;
+    }
+    setSyncingStudents(true);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      const res = await pdfReportService.syncStudents();
+      setSuccessMsg(
+        `Sinkronisasi selesai: ${res?.removedOrphanStudentsCount ?? 0} data mahasiswa tanpa arsip PDF dihapus, ${res?.syncedStudentsCount ?? 0} mahasiswa tersinkronkan dengan ${res?.remainingReportsCount ?? 0} arsip PDF.`
+      );
+      await loadArchives();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Gagal menyinkronkan data mahasiswa.');
+    } finally {
+      setSyncingStudents(false);
     }
   };
 
@@ -195,7 +235,7 @@ export const PdfUploadPage: React.FC = () => {
       {/* Upload & Metadata Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
         {/* Dropzone Card */}
-        <div className="xl:col-span-5 bg-white rounded-3xl border border-[#ECEEF2] shadow-card p-6 space-y-5">
+        <div data-guide="pdf-dropzone" className="xl:col-span-5 bg-white rounded-3xl border border-[#ECEEF2] shadow-card p-6 space-y-5">
           <div
             onClick={() => fileInputRef.current?.click()}
             onDragOver={(e) => e.preventDefault()}
@@ -388,14 +428,25 @@ export const PdfUploadPage: React.FC = () => {
 
       {/* PDF Archive History Table */}
       <div className="bg-white rounded-3xl border border-[#ECEEF2] shadow-card p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="text-base font-bold text-obsidian">Riwayat Arsip Laporan PDF</h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Unggah PDF berkala untuk mengaktifkan perbandingan tren kenaikan poin antar-periode
+              Menghapus arsip PDF otomatis menghapus mahasiswa yang hanya berasal dari PDF tersebut & menyinkronkan ulang poin mahasiswa lainnya
             </p>
           </div>
-          <Badge color="dark">{archives.length} Dokumen</Badge>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={syncingStudents}
+              icon={<RefreshCw className="w-3.5 h-3.5" />}
+              onClick={handleSyncStudents}
+            >
+              Sinkronkan Mahasiswa
+            </Button>
+            <Badge color="dark">{archives.length} Dokumen</Badge>
+          </div>
         </div>
 
         {loadingArchives ? (

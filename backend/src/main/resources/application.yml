@@ -45,7 +45,8 @@ app:
     expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24 hours
   ml:
     service-url: ${ML_SERVICE_URL:http://localhost:8001}
-    timeout-ms: 60000
+    api-key: ${ML_SERVICE_API_KEY:}
+    timeout-ms: 120000
 
 logging:
   level:

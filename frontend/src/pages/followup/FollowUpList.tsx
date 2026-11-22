@@ -101,9 +101,11 @@ export const FollowUpList: React.FC = () => {
             Pilar Kedisiplinan • Catatan pemanggilan, pendampingan pastoral, dan evaluasi perkembangan mahasiswa
           </p>
         </div>
-        <Button variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setIsCreateOpen(true)}>
-          Catat Sesi Pembinaan
-        </Button>
+        <div data-guide="followup-action">
+          <Button variant="primary" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setIsCreateOpen(true)}>
+            Catat Sesi Pembinaan
+          </Button>
+        </div>
       </div>
 
       {/* Filter Pills */}

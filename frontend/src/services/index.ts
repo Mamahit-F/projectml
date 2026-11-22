@@ -15,6 +15,7 @@ import type {
 export { authService } from './authService';
 export { studentService } from './studentService';
 export { welfareService } from './welfareService';
+export { mlService } from './mlService';
 
 export const pdfReportService = {
   async preview(file: File): Promise<PdfPreviewResponse> {
@@ -67,7 +68,13 @@ export const pdfReportService = {
   },
 
   async delete(id: number) {
-    await api.delete(`/pdf-reports/${id}`);
+    const res = await api.delete<ApiResponse<any>>(`/pdf-reports/${id}`, { timeout: 90000 });
+    return res.data.data;
+  },
+
+  async syncStudents() {
+    const res = await api.post<ApiResponse<any>>('/pdf-reports/sync-students', {}, { timeout: 90000 });
+    return res.data.data;
   },
 };
 

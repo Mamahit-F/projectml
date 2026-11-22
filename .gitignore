@@ -18,3 +18,7 @@
 # Environment & local secrets
 .env
 *.local
+
+# Generated ML runtime artifacts & sensitive student data caches
+ml-service/artifacts/
+**/.pytest_cache/

@@ -103,7 +103,7 @@ export const PredictionPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="relative z-10 shrink-0">
+        <div data-guide="risk-run-btn" className="relative z-10 shrink-0">
           <Button
             variant="coral"
             size="lg"
@@ -117,7 +117,7 @@ export const PredictionPage: React.FC = () => {
       </div>
 
       {/* Jobgio-Style Vertical Quick Stats Pill Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div data-guide="risk-cards" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           {
             key: 'HIGH',
