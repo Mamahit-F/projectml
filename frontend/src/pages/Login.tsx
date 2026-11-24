@@ -5,8 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui';
 
 export const Login: React.FC = () => {
-  const [username, setUsername] = useState('user');
-  const [password, setPassword] = useState('password');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -93,7 +93,7 @@ export const Login: React.FC = () => {
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="user"
+                  placeholder="Masukkan username atau email"
                   className="w-full pl-10 pr-4 py-2.5 text-sm bg-[#F7F8FA] border border-[#E6E8EE] rounded-2xl focus:outline-none focus:bg-white focus:ring-2 focus:ring-obsidian/15 focus:border-obsidian transition"
                 />
               </div>
@@ -126,24 +126,26 @@ export const Login: React.FC = () => {
             </Button>
           </form>
 
-          <div className="mt-7 pt-5 border-t border-[#F0F1F4] flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-semibold text-slate-500">Akun Default (Peran Tunggal: User)</p>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Username: <strong className="text-obsidian">user</strong> • Password: <strong className="text-obsidian">password</strong>
-              </p>
+          {import.meta.env.DEV && (
+            <div className="mt-7 pt-5 border-t border-[#F0F1F4] flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500">Mode Pengembangan Lokal</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Gunakan akun lokal yang terkonfigurasi di server pengembangan.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setUsername('user');
+                  setPassword('password');
+                }}
+                className="px-3.5 py-1.5 rounded-full bg-[#F4F5F7] hover:bg-obsidian hover:text-white text-xs font-semibold text-obsidian transition"
+              >
+                Isi Dev
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setUsername('user');
-                setPassword('password');
-              }}
-              className="px-3.5 py-1.5 rounded-full bg-[#F4F5F7] hover:bg-obsidian hover:text-white text-xs font-semibold text-obsidian transition"
-            >
-              Isi Otomatis
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -42,6 +42,9 @@ public class MLPredictionService {
     @Value("${app.ml.service-url:http://localhost:8001}")
     private String mlServiceUrl;
 
+    @Value("${app.ml.api-key:}")
+    private String mlApiKey;
+
     @Transactional(readOnly = true)
     public Optional<StudentPredictionDTO> getLatestPrediction(Long studentId) {
         SemesterSetting setting = semesterSettingService.getOrCreateDefault();
@@ -270,6 +273,9 @@ public class MLPredictionService {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
+            if (mlApiKey != null && !mlApiKey.isBlank()) {
+                headers.set("X-ML-API-Key", mlApiKey.trim());
+            }
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
             ResponseEntity<Map> response = restTemplate.postForEntity(endpoint, entity, Map.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {

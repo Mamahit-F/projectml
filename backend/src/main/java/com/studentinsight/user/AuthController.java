@@ -56,6 +56,9 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserDTO>> getCurrentUser(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).body(ApiResponse.error("Sesi tidak valid. Silakan masuk kembali."));
+        }
         UserDTO user = userService.getUserByUsername(authentication.getName());
         return ResponseEntity.ok(ApiResponse.ok("Profil pengguna dimuat", user));
     }
@@ -64,6 +67,9 @@ public class AuthController {
     public ResponseEntity<ApiResponse<UserDTO>> updateProfile(
             Authentication authentication,
             @RequestBody UpdateUserRequest request) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).body(ApiResponse.error("Sesi tidak valid. Silakan masuk kembali."));
+        }
         UserDTO current = userService.getUserByUsername(authentication.getName());
         request.setRole(Role.ROLE_USER);
         UserDTO updated = userService.updateUser(current.getId(), request);

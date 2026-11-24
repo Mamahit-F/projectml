@@ -1,77 +1,89 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
     container_name: studentinsight-postgres
-    restart: always
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: studentinsight_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB:-studentinsight_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-studentinsight_db}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   ml-service:
     build:
       context: ./ml-service
       dockerfile: Dockerfile
     container_name: studentinsight-ml-service
-    restart: always
-    ports:
-      - "8001:8001"
+    restart: unless-stopped
     environment:
       - PORT=8001
-      - API_SECRET_KEY=studentinsight-ml-secret-key-2026
+      - API_SECRET_KEY=${ML_SERVICE_API_KEY:?Set ML_SERVICE_API_KEY in .env}
       - HISTORICAL_DATA_DIR=/data/historical
       - ML_ARTIFACTS_DIR=/app/artifacts
+      - ML_CORS_ALLOWED_ORIGINS=${ML_CORS_ALLOWED_ORIGINS:-http://backend:8080,http://localhost:3000}
+      - ML_RANDOM_STATE=${ML_RANDOM_STATE:-42}
     volumes:
-      - ../Data Poin Mahasiswa:/data/historical:ro
-      - ./ml-service/artifacts:/app/artifacts
+      - ${HISTORICAL_DATA_HOST_DIR:-../Data Poin Mahasiswa}:/data/historical:ro
+      - ml_artifacts:/app/artifacts
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 10s
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8001/health"]
+      interval: 15s
       timeout: 5s
-      retries: 3
+      start_period: 20s
+      retries: 5
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: studentinsight-backend
-    restart: always
-    ports:
-      - "8080:8080"
+    restart: unless-stopped
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/studentinsight_db
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-studentinsight_db}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-postgres}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       - ML_SERVICE_URL=http://ml-service:8001
-      - ML_SERVICE_API_KEY=studentinsight-ml-secret-key-2026
-      - JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+      - ML_SERVICE_API_KEY=${ML_SERVICE_API_KEY:?Set ML_SERVICE_API_KEY in .env}
+      - JWT_SECRET=${JWT_SECRET:?Set a strong 64+ hex JWT_SECRET in .env}
+      - JWT_EXPIRATION_MS=${JWT_EXPIRATION_MS:-86400000}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      - APP_BOOTSTRAP_DEFAULT_USER_ENABLED=${APP_BOOTSTRAP_DEFAULT_USER_ENABLED:-true}
+      - APP_BOOTSTRAP_DEFAULT_USER_USERNAME=${APP_BOOTSTRAP_DEFAULT_USER_USERNAME:-user}
+      - APP_BOOTSTRAP_DEFAULT_USER_EMAIL=${APP_BOOTSTRAP_DEFAULT_USER_EMAIL:-user@unklab.ac.id}
+      - APP_BOOTSTRAP_DEFAULT_USER_PASSWORD=${APP_BOOTSTRAP_DEFAULT_USER_PASSWORD:?Set APP_BOOTSTRAP_DEFAULT_USER_PASSWORD in .env}
+      - APP_LOG_LEVEL=${APP_LOG_LEVEL:-INFO}
     depends_on:
       postgres:
         condition: service_healthy
       ml-service:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
     container_name: studentinsight-frontend
-    restart: always
+    restart: unless-stopped
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres_data:
+  ml_artifacts:

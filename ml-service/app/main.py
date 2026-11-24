@@ -5,7 +5,7 @@ from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, Upload
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from app.config import ML_API_SECRET_KEY
+from app.config import ML_API_SECRET_KEY, ML_CORS_ALLOWED_ORIGINS
 from app.ml.pipeline import (
     compare_models,
     get_clusters_view,
@@ -36,10 +36,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ML_CORS_ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-ML-API-Key"],
 )
 
 
@@ -175,7 +175,7 @@ def model_info():
     }
 
 
-@app.post("/parse-pdf")
+@app.post("/parse-pdf", dependencies=[Depends(verify_api_key)])
 async def parse_pdf_endpoint(file: UploadFile = File(...)):
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="File harus berformat PDF (.pdf).")
@@ -192,7 +192,7 @@ async def parse_pdf_endpoint(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Gagal membaca dokumen PDF: {str(e)}")
 
 
-@app.post("/analyze-risk")
+@app.post("/analyze-risk", dependencies=[Depends(verify_api_key)])
 def analyze_risk_endpoint(req: BatchRiskAnalyzeRequest):
     try:
         return analyze_student_risks(req.model_dump())

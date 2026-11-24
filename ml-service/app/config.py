@@ -27,6 +27,16 @@ REGISTRY_FILE = ARTIFACTS_DIR / "registry.json"
 # Optional API key for service-to-service authentication between Spring Boot and FastAPI
 ML_API_SECRET_KEY = os.getenv("API_SECRET_KEY", "").strip()
 
+# Allowed CORS origins (comma-separated) — restrict to trusted origins in production
+ML_CORS_ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.getenv(
+        "ML_CORS_ALLOWED_ORIGINS",
+        "http://localhost:8080,http://localhost:5173,http://localhost:3000,http://127.0.0.1:8080,http://127.0.0.1:5173",
+    ).split(",")
+    if o.strip()
+]
+
 # Reproducibility seed
 RANDOM_STATE = int(os.getenv("ML_RANDOM_STATE", "42"))
 

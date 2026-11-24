@@ -15,6 +15,10 @@ const ML_DIR = path.join(ROOT_DIR, 'ml-service');
 const BACKEND_JAR = path.join(BACKEND_DIR, 'target', 'studentinsight-backend-1.0.0.jar');
 const ML_PYTHON = path.join(ML_DIR, '.venv', 'Scripts', 'python.exe');
 const PG_SERVICE = 'postgresql-x64-18';
+const LOCAL_PG_CANDIDATES = [
+  process.env.PG_HOME,
+  'D:\\pgsql',
+].filter(Boolean);
 
 const COLORS = {
   reset: '\x1b[0m',
@@ -74,16 +78,38 @@ async function ensurePostgres() {
     return true;
   }
 
+  // 1. Prefer working local/portable PostgreSQL installation (e.g., D:\pgsql) — no UAC prompt needed
+  for (const pgHome of LOCAL_PG_CANDIDATES) {
+    const pgCtl = path.join(pgHome, 'bin', 'pg_ctl.exe');
+    const pgData = path.join(pgHome, 'data');
+    const pgLog = path.join(pgHome, 'server.log');
+    if (fs.existsSync(pgCtl) && fs.existsSync(path.join(pgData, 'PG_VERSION'))) {
+      log('SYSTEM', COLORS.yellow, `PostgreSQL (port 5432) belum aktif. Menyalakan PostgreSQL lokal dari ${pgHome}...`);
+      const res = spawnSync(pgCtl, ['-D', pgData, '-l', pgLog, 'start'], {
+        stdio: 'ignore',
+        windowsHide: true,
+        timeout: 25000,
+      });
+      if (res.status === 0 || (await waitForPort(5432, 12000))) {
+        if (await waitForPort(5432, 8000)) {
+          log('SYSTEM', COLORS.green, `PostgreSQL lokal (${pgHome}) berhasil dinyalakan di port 5432!`);
+          return true;
+        }
+      }
+      log('SYSTEM', COLORS.yellow, `Gagal menyalakan PostgreSQL lokal di ${pgHome}. Mencoba layanan Windows...`);
+    }
+  }
+
   log('SYSTEM', COLORS.yellow, `PostgreSQL (port 5432) belum aktif. Mencoba menyalakan layanan ${PG_SERVICE}...`);
 
-  // Attempt direct start (succeeds immediately if terminal is elevated)
+  // 2. Fallback: Attempt direct Windows service start (succeeds immediately if terminal is elevated)
   spawnSync('sc', ['start', PG_SERVICE], { stdio: 'ignore', windowsHide: true });
   if (await waitForPort(5432, 4000)) {
     log('SYSTEM', COLORS.green, 'PostgreSQL berhasil dinyalakan.');
     return true;
   }
 
-  // If interactive Windows session, request standard UAC permission to start the Windows service
+  // 3. Fallback: If interactive Windows session, request UAC permission to start the Windows service
   if (process.platform === 'win32' && process.stdin.isTTY) {
     log('SYSTEM', COLORS.yellow, 'Meminta izin Administrator Windows (UAC) untuk menyalakan PostgreSQL — silakan klik "Yes"...');
     spawnSync(
@@ -104,7 +130,7 @@ async function ensurePostgres() {
   log(
     'SYSTEM',
     COLORS.red,
-    `PostgreSQL masih berhenti. Nyalakan layanan "${PG_SERVICE}" lewat Services (Windows+R -> services.msc -> Start) lalu jalankan "npm run dev" lagi.`
+    `PostgreSQL masih berhenti. Pastikan PostgreSQL di D:\\pgsql atau layanan "${PG_SERVICE}" berjalan di port 5432 lalu jalankan "npm run dev" lagi.`
   );
   return false;
 }

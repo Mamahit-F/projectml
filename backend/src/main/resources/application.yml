@@ -40,6 +40,14 @@ spring:
     locations: classpath:db/migration
 
 app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173}
+  bootstrap:
+    default-user:
+      enabled: ${APP_BOOTSTRAP_DEFAULT_USER_ENABLED:true}
+      username: ${APP_BOOTSTRAP_DEFAULT_USER_USERNAME:user}
+      email: ${APP_BOOTSTRAP_DEFAULT_USER_EMAIL:user@unklab.ac.id}
+      password: ${APP_BOOTSTRAP_DEFAULT_USER_PASSWORD:password}
   jwt:
     secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24 hours
@@ -48,8 +56,17 @@ app:
     api-key: ${ML_SERVICE_API_KEY:}
     timeout-ms: 120000
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
 logging:
   level:
     root: INFO
-    com.studentinsight: DEBUG
+    com.studentinsight: ${APP_LOG_LEVEL:INFO}
     org.springframework.security: INFO

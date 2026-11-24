@@ -48,6 +48,9 @@ public class PdfReportService {
     @Value("${app.ml.service-url:http://localhost:8001}")
     private String mlServiceUrl;
 
+    @Value("${app.ml.api-key:}")
+    private String mlApiKey;
+
     private User getCurrentUser() {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -517,6 +520,9 @@ public class PdfReportService {
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            if (mlApiKey != null && !mlApiKey.isBlank()) {
+                headers.set("X-ML-API-Key", mlApiKey.trim());
+            }
 
             HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
             ResponseEntity<Map> response = restTemplate.postForEntity(endpoint, requestEntity, Map.class);
