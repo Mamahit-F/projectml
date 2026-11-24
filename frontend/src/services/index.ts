@@ -16,6 +16,7 @@ export { authService } from './authService';
 export { studentService } from './studentService';
 export { welfareService } from './welfareService';
 export { mlService } from './mlService';
+export { assistantService } from './assistantService';
 
 export const pdfReportService = {
   async preview(file: File): Promise<PdfPreviewResponse> {

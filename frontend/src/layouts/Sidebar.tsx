@@ -22,6 +22,7 @@ import { useGuide } from '../contexts/GuideContext';
 interface SidebarProps {
   mobileOpen: boolean;
   onClose: () => void;
+  onMenuSelect?: () => void;
 }
 
 const navItems = [
@@ -36,7 +37,7 @@ const navItems = [
   { to: '/reports-settings', label: 'Laporan & Semester', icon: SlidersHorizontal },
 ];
 
-export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onClose }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onClose, onMenuSelect }) => {
   const { user, logout } = useAuth();
   const { isGuideActive, viewMode, currentStep, openGuide, openGuideForCurrentPage, cancelGuide } = useGuide();
   const location = useLocation();
@@ -89,7 +90,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onClose }) => {
                 key={item.to}
                 to={item.to}
                 data-guide-id={item.to}
-                onClick={onClose}
+                onClick={() => {
+                  onMenuSelect?.();
+                  onClose();
+                }}
                 className={`group flex items-center gap-3 px-2.5 py-2 rounded-full text-[13px] font-semibold transition-all duration-150 ${
                   isGuidedTarget
                     ? 'bg-obsidian text-white ring-2 ring-coral-500 ring-offset-2 shadow-coral'
@@ -148,6 +152,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onClose }) => {
               <button
                 type="button"
                 onClick={() => {
+                  onMenuSelect?.();
                   onClose();
                   openGuideForCurrentPage();
                 }}
@@ -158,6 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onClose }) => {
               <button
                 type="button"
                 onClick={() => {
+                  onMenuSelect?.();
                   onClose();
                   openGuide('handbook');
                 }}
@@ -196,7 +202,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onClose }) => {
 
   return (
     <>
-      <div className="hidden lg:block h-screen sticky top-0 shrink-0">{content}</div>
+      <div className="hidden lg:block h-screen sticky top-0 shrink-0 z-40">{content}</div>
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
           <div className="fixed inset-0 bg-obsidian/40 backdrop-blur-xs" onClick={onClose} />

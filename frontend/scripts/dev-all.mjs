@@ -20,6 +20,34 @@ const LOCAL_PG_CANDIDATES = [
   'D:\\pgsql',
 ].filter(Boolean);
 
+function loadRootDotEnv() {
+  const envPath = path.join(ROOT_DIR, '.env');
+  const loaded = {};
+  if (!fs.existsSync(envPath)) return loaded;
+  try {
+    const raw = fs.readFileSync(envPath, 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq <= 0) continue;
+      const key = trimmed.slice(0, eq).trim();
+      let val = trimmed.slice(eq + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (key && !(key in process.env)) {
+        loaded[key] = val;
+      }
+    }
+  } catch {
+    // ignore malformed .env
+  }
+  return loaded;
+}
+
+const ROOT_ENV = { ...loadRootDotEnv(), ...process.env };
+
 const COLORS = {
   reset: '\x1b[0m',
   bold: '\x1b[1m',
@@ -212,7 +240,7 @@ async function main() {
     const backendChild = spawn(
       'java',
       ['-Xms128m', '-Xmx384m', '-jar', BACKEND_JAR],
-      { cwd: BACKEND_DIR, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }
+      { cwd: BACKEND_DIR, env: ROOT_ENV, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }
     );
     attachProcess('SERVER', COLORS.coral, backendChild);
   }
