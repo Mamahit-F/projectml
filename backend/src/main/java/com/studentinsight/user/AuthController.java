@@ -2,6 +2,7 @@ package com.studentinsight.user;
 
 import com.studentinsight.common.ApiResponse;
 import com.studentinsight.config.JwtTokenProvider;
+import com.studentinsight.user.dto.ChangePasswordRequest;
 import com.studentinsight.user.dto.LoginRequest;
 import com.studentinsight.user.dto.LoginResponse;
 import com.studentinsight.user.dto.UpdateUserRequest;
@@ -74,6 +75,17 @@ public class AuthController {
         request.setRole(Role.ROLE_USER);
         UserDTO updated = userService.updateUser(current.getId(), request);
         return ResponseEntity.ok(ApiResponse.ok("Profil akun berhasil diperbarui", updated));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            Authentication authentication,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).body(ApiResponse.error("Sesi tidak valid. Silakan masuk kembali."));
+        }
+        userService.changePassword(authentication.getName(), request);
+        return ResponseEntity.ok(ApiResponse.ok("Password akun berhasil diperbarui", null));
     }
 
     @PostMapping("/logout")

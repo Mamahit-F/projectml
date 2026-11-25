@@ -3,6 +3,7 @@ package com.studentinsight.user;
 import com.studentinsight.audit.AuditLogService;
 import com.studentinsight.common.BadRequestException;
 import com.studentinsight.common.ResourceNotFoundException;
+import com.studentinsight.user.dto.ChangePasswordRequest;
 import com.studentinsight.user.dto.CreateUserRequest;
 import com.studentinsight.user.dto.UpdateUserRequest;
 import com.studentinsight.user.dto.UserDTO;
@@ -103,5 +104,26 @@ public class UserService {
                 "User status changed to " + (updated.isActive() ? "ACTIVE" : "INACTIVE"));
 
         return UserDTO.fromEntity(updated);
+    }
+
+    @Transactional
+    public void changePassword(String username, ChangePasswordRequest request) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "username", username));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new BadRequestException("Password saat ini tidak sesuai.");
+        }
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new BadRequestException("Konfirmasi password baru tidak cocok.");
+        }
+        if (request.getNewPassword().equals(request.getCurrentPassword())) {
+            throw new BadRequestException("Password baru harus berbeda dari password saat ini.");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+        auditLogService.log("CHANGE_PASSWORD", "User", user.getId(), null, null,
+                "User changed account password: " + user.getUsername());
     }
 }
