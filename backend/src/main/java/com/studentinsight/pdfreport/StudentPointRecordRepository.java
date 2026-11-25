@@ -3,10 +3,12 @@ package com.studentinsight.pdfreport;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,6 +31,9 @@ public interface StudentPointRecordRepository extends JpaRepository<StudentPoint
     @Query("SELECT r FROM StudentPointRecord r JOIN FETCH r.pdfReport p WHERE r.student.id = :studentId ORDER BY p.reportDate ASC, p.createdAt ASC")
     List<StudentPointRecord> findHistoryByStudentId(@Param("studentId") Long studentId);
 
+    @Query("SELECT r FROM StudentPointRecord r JOIN FETCH r.pdfReport p WHERE r.student.id IN :studentIds ORDER BY r.student.id ASC, p.reportDate ASC, p.createdAt ASC")
+    List<StudentPointRecord> findHistoryByStudentIdIn(@Param("studentIds") Collection<Long> studentIds);
+
     @Query("SELECT r FROM StudentPointRecord r JOIN FETCH r.pdfReport p ORDER BY p.reportDate ASC, p.createdAt ASC")
     List<StudentPointRecord> findAllWithReportOrdered();
 
@@ -40,5 +45,7 @@ public interface StudentPointRecordRepository extends JpaRepository<StudentPoint
     @Query("SELECT DISTINCT r.student.id FROM StudentPointRecord r")
     List<Long> findAllStudentIdsWithRecords();
 
-    void deleteByPdfReportId(Long pdfReportId);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM StudentPointRecord r WHERE r.pdfReport.id = :pdfReportId")
+    void deleteByPdfReportId(@Param("pdfReportId") Long pdfReportId);
 }

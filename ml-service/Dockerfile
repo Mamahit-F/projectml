@@ -25,6 +25,6 @@ USER mluser
 EXPOSE 8001
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=15s --retries=5 \
-    CMD curl -fsS http://127.0.0.1:8001/health || exit 1
+    CMD sh -c 'curl -fsS "http://127.0.0.1:${PORT:-8001}/health" || exit 1'
 
-CMD ["sh", "-c", "if [ ! -f /app/artifacts/registry.json ] && [ -d \"${HISTORICAL_DATA_DIR:-/data/historical}\" ] && [ -n \"$(ls -A \"${HISTORICAL_DATA_DIR:-/data/historical}\" 2>/dev/null)\" ]; then python scripts/run_historical_ml_pipeline.py --select-recommended; fi && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8001}"]
+CMD ["sh", "-c", "if [ ! -f /app/artifacts/registry.json ] && [ -d \"${HISTORICAL_DATA_DIR:-/data/historical}\" ] && [ -n \"$(ls -A \"${HISTORICAL_DATA_DIR:-/data/historical}\" 2>/dev/null)\" ]; then python scripts/run_historical_ml_pipeline.py --select-recommended; fi; UVICORN_HOST=0.0.0.0; [ -f /proc/net/if_inet6 ] && UVICORN_HOST=::; exec uvicorn app.main:app --host \"$UVICORN_HOST\" --port \"${PORT:-8001}\""]

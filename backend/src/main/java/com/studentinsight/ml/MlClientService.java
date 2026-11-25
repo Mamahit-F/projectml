@@ -114,7 +114,25 @@ public class MlClientService {
         try {
             JsonNode node = objectMapper.readTree(body);
             if (node.has("detail")) {
-                return node.get("detail").asText();
+                JsonNode detailNode = node.get("detail");
+                if (detailNode.isTextual()) {
+                    return detailNode.asText();
+                }
+                if (detailNode.isArray() && !detailNode.isEmpty()) {
+                    StringBuilder sb = new StringBuilder();
+                    for (JsonNode item : detailNode) {
+                        if (sb.length() > 0) sb.append("; ");
+                        String msg = item.has("msg") ? item.get("msg").asText() : item.toString();
+                        if (item.has("loc") && item.get("loc").isArray() && !item.get("loc").isEmpty()) {
+                            String field = item.get("loc").get(item.get("loc").size() - 1).asText();
+                            sb.append(field).append(": ").append(msg);
+                        } else {
+                            sb.append(msg);
+                        }
+                    }
+                    return sb.toString();
+                }
+                return detailNode.toString();
             }
         } catch (Exception ignored) {
         }

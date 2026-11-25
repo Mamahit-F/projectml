@@ -100,7 +100,31 @@ async function waitForPort(port, timeoutMs = 20000) {
   return false;
 }
 
+function parseRemoteDatasource(jdbcUrl) {
+  if (!jdbcUrl || typeof jdbcUrl !== 'string') return null;
+  const match = jdbcUrl.match(/^jdbc:postgresql:\/\/([^/:?]+)(?::(\d+))?/i);
+  if (!match) return null;
+  const host = match[1].trim().toLowerCase();
+  const port = match[2] ? Number(match[2]) : 5432;
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
+    return null;
+  }
+  return { host, port };
+}
+
 async function ensurePostgres() {
+  const remoteDb = parseRemoteDatasource(ROOT_ENV.SPRING_DATASOURCE_URL);
+  if (remoteDb) {
+    log('SYSTEM', COLORS.cyan, `Menggunakan database Cloud/Remote (${remoteDb.host}:${remoteDb.port}) dari .env — melewati PostgreSQL lokal.`);
+    const reachable = await isPortOpen(remoteDb.port, remoteDb.host);
+    if (reachable) {
+      log('SYSTEM', COLORS.green, `Koneksi ke database remote (${remoteDb.host}:${remoteDb.port}) terverifikasi!`);
+      return true;
+    }
+    log('SYSTEM', COLORS.yellow, `Peringatan: port ${remoteDb.port} pada ${remoteDb.host} belum merespons cepat; tetap melanjutkan ke backend...`);
+    return true;
+  }
+
   if (await isPortOpen(5432)) {
     log('SYSTEM', COLORS.green, 'PostgreSQL sudah aktif di port 5432.');
     return true;

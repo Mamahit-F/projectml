@@ -15,11 +15,18 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1/students")
 @RequiredArgsConstructor
 public class StudentController {
+
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "id", "nim", "fullName", "studyProgram", "faculty",
+            "latestSabbathPoints", "pointsDelta", "riskCategory",
+            "projectedEndPoints", "status", "createdAt", "updatedAt"
+    );
 
     private final StudentService studentService;
     private final PdfReportService pdfReportService;
@@ -36,9 +43,12 @@ public class StudentController {
             @RequestParam(defaultValue = "latestSabbathPoints") String sortBy,
             @RequestParam(defaultValue = "desc") String direction) {
 
-        Sort sort = direction.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 200);
+        String safeSortBy = ALLOWED_SORT_FIELDS.contains(sortBy) ? sortBy : "latestSabbathPoints";
+        Sort sort = direction.equalsIgnoreCase("asc") ? Sort.by(safeSortBy).ascending() : Sort.by(safeSortBy).descending();
         Page<StudentDTO> students = studentService.searchStudents(
-                search, studyProgram, riskCategory, residenceCategoryId, status, PageRequest.of(page, size, sort));
+                search, studyProgram, riskCategory, residenceCategoryId, status, PageRequest.of(safePage, safeSize, sort));
         return ResponseEntity.ok(ApiResponse.ok("Daftar mahasiswa dimuat", students));
     }
 

@@ -59,9 +59,11 @@ public class PdfReportController {
             @RequestParam(required = false) String riskCategory,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 200);
         Page<Map<String, Object>> records = pdfReportService.getReportRecords(
                 id, search, studyProgram, riskCategory,
-                PageRequest.of(page, size, Sort.by(Sort.Order.desc("sabbathPoints"), Sort.Order.asc("rowNumber"))));
+                PageRequest.of(safePage, safeSize, Sort.by(Sort.Order.desc("sabbathPoints"), Sort.Order.asc("rowNumber"))));
         return ResponseEntity.ok(ApiResponse.ok("Daftar poin mahasiswa dalam laporan dimuat", records));
     }
 

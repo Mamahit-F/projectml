@@ -5,7 +5,7 @@ const envBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+
 const api = axios.create({
   baseURL: envBaseUrl || '/api/v1',
   headers: { 'Content-Type': 'application/json' },
-  timeout: 30000,
+  timeout: 90000,
 });
 
 // Request interceptor – attach JWT

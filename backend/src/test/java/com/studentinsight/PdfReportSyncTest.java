@@ -100,9 +100,8 @@ class PdfReportSyncTest {
 
         when(pdfReportRepository.findById(2L)).thenReturn(Optional.of(reportNov));
         when(pointRecordRepository.findDistinctStudentIdsByPdfReportId(2L)).thenReturn(List.of(100L, 200L));
-        when(pointRecordRepository.findHistoryByStudentId(100L)).thenReturn(List.of());
-        when(pointRecordRepository.findHistoryByStudentId(200L)).thenReturn(List.of(octRec));
-        when(studentRepository.findById(200L)).thenReturn(Optional.of(sharedStudent));
+        when(pointRecordRepository.findHistoryByStudentIdIn(List.of(100L, 200L))).thenReturn(List.of(octRec));
+        when(studentRepository.findAllById(List.of(200L))).thenReturn(List.of(sharedStudent));
         when(pdfReportRepository.findFirstByOrderByReportDateDescCreatedAtDesc()).thenReturn(Optional.of(reportOct));
         when(pdfReportRepository.count()).thenReturn(1L);
         when(studentRepository.countByStatus("ACTIVE")).thenReturn(1L);
@@ -113,8 +112,8 @@ class PdfReportSyncTest {
         assertEquals(1, summary.get("recalculatedStudentsCount"));
         assertEquals(1L, summary.get("remainingReportsCount"));
 
-        // Verify exclusive student 100 was deleted, while shared student 200 was NOT deleted
-        verify(studentRepository, times(1)).deleteAllById(List.of(100L));
+        // Verify exclusive student 100 was deleted in bulk, while shared student 200 was NOT deleted
+        verify(studentRepository, times(1)).deleteByIdInBulk(List.of(100L));
         verify(predictionRepository, times(1)).deleteByPdfReportId(2L);
         verify(predictionRepository, times(1)).deleteByStudentIdIn(List.of(100L));
 
@@ -144,6 +143,34 @@ class PdfReportSyncTest {
         assertEquals(2, res.get("removedOrphanStudentsCount"));
         assertEquals(0, res.get("syncedStudentsCount"));
         verify(predictionRepository, times(1)).deleteByStudentIdIn(List.of(10L, 20L));
-        verify(studentRepository, times(1)).deleteAllById(List.of(10L, 20L));
+        verify(studentRepository, times(1)).deleteByIdInBulk(List.of(10L, 20L));
+        verify(predictionRepository, times(1)).deleteAllInBulk();
+    }
+
+    @Test
+    void deleteReport_WhenLastReportDeleted_ClearsAllStudentsAndPredictions() {
+        PdfReport onlyReport = PdfReport.builder()
+                .id(5L)
+                .fileName("only_report.pdf")
+                .facultyName("Fakultas Pertanian")
+                .reportDate(LocalDate.of(2026, 11, 25))
+                .build();
+
+        when(pdfReportRepository.findById(5L)).thenReturn(Optional.of(onlyReport));
+        when(pointRecordRepository.findDistinctStudentIdsByPdfReportId(5L)).thenReturn(List.of(301L, 302L));
+        when(pointRecordRepository.findHistoryByStudentIdIn(List.of(301L, 302L))).thenReturn(List.of());
+        when(pdfReportRepository.findFirstByOrderByReportDateDescCreatedAtDesc()).thenReturn(Optional.empty());
+        when(pdfReportRepository.count()).thenReturn(0L);
+        when(studentRepository.deleteAllStudentsInBulk()).thenReturn(0);
+
+        Map<String, Object> summary = pdfReportService.deleteReport(5L);
+
+        assertEquals(2, summary.get("deletedStudentsCount"));
+        assertEquals(0, summary.get("recalculatedStudentsCount"));
+        assertEquals(0L, summary.get("remainingReportsCount"));
+        verify(studentRepository, times(1)).deleteByIdInBulk(List.of(301L, 302L));
+        verify(studentRepository, times(1)).deleteAllStudentsInBulk();
+        verify(predictionRepository, times(1)).deleteAllInBulk();
+        verify(predictionService, never()).analyzeAllActiveStudents(any());
     }
 }

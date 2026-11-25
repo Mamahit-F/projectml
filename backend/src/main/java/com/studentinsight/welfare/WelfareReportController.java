@@ -29,7 +29,9 @@ public class WelfareReportController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        Page<WelfareReportDTO> reports = reportService.searchReports(status, priority, reportType, PageRequest.of(page, size));
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 200);
+        Page<WelfareReportDTO> reports = reportService.searchReports(status, priority, reportType, PageRequest.of(safePage, safeSize));
         return ResponseEntity.ok(ApiResponse.ok("Laporan kesejahteraan dimuat", reports));
     }
 

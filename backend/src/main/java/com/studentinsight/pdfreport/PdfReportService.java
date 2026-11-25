@@ -10,13 +10,17 @@ import com.studentinsight.student.Student;
 import com.studentinsight.student.StudentRepository;
 import com.studentinsight.user.User;
 import com.studentinsight.user.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.*;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -27,6 +31,7 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.sql.Types;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -44,6 +49,12 @@ public class PdfReportService {
     private final MLPredictionRepository predictionRepository;
     private final AuditLogService auditLogService;
     private final RestTemplate restTemplate;
+
+    @Autowired(required = false)
+    private JdbcTemplate jdbcTemplate;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Value("${app.ml.service-url:http://localhost:8001}")
     private String mlServiceUrl;
@@ -107,13 +118,14 @@ public class PdfReportService {
                 .notes(notes)
                 .build();
 
-        PdfReport savedReport = pdfReportRepository.save(report);
+        PdfReport savedReport = pdfReportRepository.saveAndFlush(report);
 
         // Preload existing students keyed by uppercase NIM for fast batch upsert
         Map<String, Student> existingByNim = studentRepository.findAll().stream()
                 .collect(Collectors.toMap(s -> s.getNim().trim().toUpperCase(), s -> s, (a, b) -> a));
 
-        List<Student> studentsToSave = new ArrayList<>();
+        Map<String, Student> newStudentsMap = new LinkedHashMap<>();
+        Map<String, Student> updatedStudentsMap = new LinkedHashMap<>();
         Map<String, Map<String, Object>> recordPayloadByNim = new LinkedHashMap<>();
 
         int newStudentsCount = 0;
@@ -147,16 +159,23 @@ public class PdfReportService {
                         .riskCategory(points == 0 ? "SAFE" : "LOW")
                         .build();
                 existingByNim.put(nim, student);
+                newStudentsMap.put(nim, student);
             } else {
-                updatedStudentsCount++;
+                boolean alreadyNewInSamePdf = newStudentsMap.containsKey(nim);
+                if (!alreadyNewInSamePdf) {
+                    updatedStudentsCount++;
+                }
                 int prev = student.getLatestSabbathPoints() != null ? student.getLatestSabbathPoints() : 0;
-                delta = points - prev;
+                delta = alreadyNewInSamePdf ? 0 : (points - prev);
                 student.setFirstName(firstName.isEmpty() ? student.getFirstName() : firstName);
                 student.setLastName(lastName.isEmpty() ? student.getLastName() : lastName);
                 student.setFullName(fullName);
                 student.setStudyProgram(prodi);
                 student.setFaculty(resolvedFaculty);
-                student.setPreviousSabbathPoints(prev);
+                if (!alreadyNewInSamePdf) {
+                    student.setPreviousSabbathPoints(prev);
+                    updatedStudentsMap.put(nim, student);
+                }
                 student.setLatestSabbathPoints(points);
                 student.setPointsDelta(delta);
                 student.setTotalViolationPoints(points);
@@ -164,35 +183,119 @@ public class PdfReportService {
                     student.setStatus("ACTIVE");
                 }
             }
-            studentsToSave.add(student);
 
             Map<String, Object> meta = new HashMap<>(rec);
             meta.put("computed_delta", delta);
             recordPayloadByNim.put(nim, meta);
         }
 
-        List<Student> savedStudents = studentRepository.saveAll(studentsToSave);
-        Map<String, Student> savedByNim = savedStudents.stream()
-                .collect(Collectors.toMap(s -> s.getNim().trim().toUpperCase(), s -> s, (a, b) -> a));
+        Map<String, Student> savedByNim = new HashMap<>(existingByNim);
+        if (jdbcTemplate != null) {
+            if (!newStudentsMap.isEmpty()) {
+                List<Student> newList = new ArrayList<>(newStudentsMap.values());
+                jdbcTemplate.batchUpdate(
+                        "INSERT INTO students (nim, first_name, last_name, full_name, study_program, faculty, " +
+                                "status, latest_sabbath_points, previous_sabbath_points, points_delta, " +
+                                "total_violation_points, risk_category, created_at, updated_at) " +
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                        newList,
+                        200,
+                        (ps, s) -> {
+                            ps.setString(1, s.getNim());
+                            ps.setString(2, s.getFirstName());
+                            ps.setString(3, s.getLastName());
+                            ps.setString(4, s.getFullName());
+                            ps.setString(5, s.getStudyProgram());
+                            ps.setString(6, s.getFaculty());
+                            ps.setString(7, s.getStatus());
+                            ps.setInt(8, s.getLatestSabbathPoints() != null ? s.getLatestSabbathPoints() : 0);
+                            ps.setObject(9, s.getPreviousSabbathPoints(), Types.INTEGER);
+                            ps.setInt(10, s.getPointsDelta() != null ? s.getPointsDelta() : 0);
+                            ps.setInt(11, s.getTotalViolationPoints() != null ? s.getTotalViolationPoints() : 0);
+                            ps.setString(12, s.getRiskCategory());
+                        }
+                );
+                for (Student persisted : studentRepository.findByNimIn(newStudentsMap.keySet())) {
+                    savedByNim.put(persisted.getNim().trim().toUpperCase(), persisted);
+                }
+            }
 
-        List<StudentPointRecord> pointRecords = new ArrayList<>();
-        for (Map.Entry<String, Map<String, Object>> entry : recordPayloadByNim.entrySet()) {
-            Student st = savedByNim.get(entry.getKey());
-            Map<String, Object> rec = entry.getValue();
-            int points = rec.get("sabbath_points") != null ? ((Number) rec.get("sabbath_points")).intValue() : 0;
-            int delta = rec.get("computed_delta") != null ? ((Number) rec.get("computed_delta")).intValue() : 0;
-            Integer rowNum = rec.get("row_number") != null ? ((Number) rec.get("row_number")).intValue() : null;
+            if (!updatedStudentsMap.isEmpty()) {
+                List<Student> updList = new ArrayList<>(updatedStudentsMap.values());
+                jdbcTemplate.batchUpdate(
+                        "UPDATE students SET first_name = ?, last_name = ?, full_name = ?, study_program = ?, faculty = ?, " +
+                                "previous_sabbath_points = ?, latest_sabbath_points = ?, points_delta = ?, " +
+                                "total_violation_points = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        updList,
+                        200,
+                        (ps, s) -> {
+                            ps.setString(1, s.getFirstName());
+                            ps.setString(2, s.getLastName());
+                            ps.setString(3, s.getFullName());
+                            ps.setString(4, s.getStudyProgram());
+                            ps.setString(5, s.getFaculty());
+                            ps.setObject(6, s.getPreviousSabbathPoints(), Types.INTEGER);
+                            ps.setInt(7, s.getLatestSabbathPoints() != null ? s.getLatestSabbathPoints() : 0);
+                            ps.setInt(8, s.getPointsDelta() != null ? s.getPointsDelta() : 0);
+                            ps.setInt(9, s.getTotalViolationPoints() != null ? s.getTotalViolationPoints() : 0);
+                            ps.setString(10, s.getStatus());
+                            ps.setLong(11, s.getId());
+                        }
+                );
+            }
 
-            pointRecords.add(StudentPointRecord.builder()
-                    .pdfReport(savedReport)
-                    .student(st)
-                    .rowNumber(rowNum)
-                    .sabbathPoints(points)
-                    .pointsDelta(delta)
-                    .riskCategory(points == 0 ? "SAFE" : "LOW")
-                    .build());
+            List<Map.Entry<String, Map<String, Object>>> pointEntries = new ArrayList<>(recordPayloadByNim.entrySet());
+            jdbcTemplate.batchUpdate(
+                    "INSERT INTO student_point_records (pdf_report_id, student_id, row_number, sabbath_points, " +
+                            "points_delta, risk_category, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                    pointEntries,
+                    200,
+                    (ps, entry) -> {
+                        Student st = savedByNim.get(entry.getKey());
+                        Map<String, Object> rec = entry.getValue();
+                        int points = rec.get("sabbath_points") != null ? ((Number) rec.get("sabbath_points")).intValue() : 0;
+                        int delta = rec.get("computed_delta") != null ? ((Number) rec.get("computed_delta")).intValue() : 0;
+                        Integer rowNum = rec.get("row_number") != null ? ((Number) rec.get("row_number")).intValue() : null;
+                        ps.setLong(1, savedReport.getId());
+                        ps.setLong(2, st.getId());
+                        ps.setObject(3, rowNum, Types.INTEGER);
+                        ps.setInt(4, points);
+                        ps.setInt(5, delta);
+                        ps.setString(6, points == 0 ? "SAFE" : "LOW");
+                    }
+            );
+            if (entityManager != null) {
+                entityManager.clear();
+            }
+        } else {
+            List<Student> studentsToSave = new ArrayList<>();
+            studentsToSave.addAll(newStudentsMap.values());
+            studentsToSave.addAll(updatedStudentsMap.values());
+            List<Student> savedStudents = studentRepository.saveAll(studentsToSave);
+            savedByNim.clear();
+            for (Student s : savedStudents) {
+                savedByNim.put(s.getNim().trim().toUpperCase(), s);
+            }
+
+            List<StudentPointRecord> pointRecords = new ArrayList<>();
+            for (Map.Entry<String, Map<String, Object>> entry : recordPayloadByNim.entrySet()) {
+                Student st = savedByNim.get(entry.getKey());
+                Map<String, Object> rec = entry.getValue();
+                int points = rec.get("sabbath_points") != null ? ((Number) rec.get("sabbath_points")).intValue() : 0;
+                int delta = rec.get("computed_delta") != null ? ((Number) rec.get("computed_delta")).intValue() : 0;
+                Integer rowNum = rec.get("row_number") != null ? ((Number) rec.get("row_number")).intValue() : null;
+
+                pointRecords.add(StudentPointRecord.builder()
+                        .pdfReport(savedReport)
+                        .student(st)
+                        .rowNumber(rowNum)
+                        .sabbathPoints(points)
+                        .pointsDelta(delta)
+                        .riskCategory(points == 0 ? "SAFE" : "LOW")
+                        .build());
+            }
+            pointRecordRepository.saveAll(pointRecords);
         }
-        pointRecordRepository.saveAll(pointRecords);
 
         // Immediately run dynamic K-Means clustering + semester cutoff projection
         predictionService.analyzeAllActiveStudents(savedReport);
@@ -315,52 +418,68 @@ public class PdfReportService {
         // 1. Capture exact students linked to THIS PDF before deleting records
         List<Long> affectedStudentIds = pointRecordRepository.findDistinctStudentIdsByPdfReportId(id);
 
-        // 2. Remove predictions & point records tied to this PDF, then delete the PDF archive
+        // 2. Bulk remove predictions & point records tied to this PDF, then delete the PDF archive
         predictionRepository.deleteByPdfReportId(id);
         pointRecordRepository.deleteByPdfReportId(id);
-        pointRecordRepository.flush();
-        pdfReportRepository.delete(report);
+        pdfReportRepository.deleteById(id);
         pdfReportRepository.flush();
 
-        // 3. Synchronize ONLY affected students from the deleted PDF:
-        //    - Students who ONLY existed in this PDF -> deleted completely
+        // 3. Synchronize ONLY affected students from the deleted PDF using ONE bulk history query:
+        //    - Students who ONLY existed in this PDF -> deleted completely via bulk SQL
         //    - Students who also exist in other remaining PDF(s) -> recalculated from remaining history
         List<Long> studentIdsToDelete = new ArrayList<>();
-        List<Student> studentsToUpdate = new ArrayList<>();
-        List<StudentPointRecord> recordsToUpdate = new ArrayList<>();
+        List<Long> studentIdsToRecalc = new ArrayList<>();
+        Map<Long, List<StudentPointRecord>> remainingHistoryByStudent = affectedStudentIds.isEmpty()
+                ? Map.of()
+                : pointRecordRepository.findHistoryByStudentIdIn(affectedStudentIds).stream()
+                        .collect(Collectors.groupingBy(r -> r.getStudent().getId()));
 
         for (Long studentId : affectedStudentIds) {
-            List<StudentPointRecord> remainingHistory = pointRecordRepository.findHistoryByStudentId(studentId);
+            List<StudentPointRecord> remainingHistory = remainingHistoryByStudent.getOrDefault(studentId, List.of());
             if (remainingHistory.isEmpty()) {
                 studentIdsToDelete.add(studentId);
             } else {
-                studentRepository.findById(studentId).ifPresent(student -> {
-                    recalculateStudentFromHistory(student, remainingHistory, recordsToUpdate);
+                studentIdsToRecalc.add(studentId);
+            }
+        }
+
+        List<Student> studentsToUpdate = new ArrayList<>();
+        List<StudentPointRecord> recordsToUpdate = new ArrayList<>();
+        if (!studentIdsToRecalc.isEmpty()) {
+            for (Student student : studentRepository.findAllById(studentIdsToRecalc)) {
+                List<StudentPointRecord> hist = remainingHistoryByStudent.getOrDefault(student.getId(), List.of());
+                if (!hist.isEmpty()) {
+                    recalculateStudentFromHistory(student, hist, recordsToUpdate);
                     studentsToUpdate.add(student);
-                });
+                }
             }
         }
 
         if (!studentIdsToDelete.isEmpty()) {
             predictionRepository.deleteByStudentIdIn(studentIdsToDelete);
-            predictionRepository.flush();
-            studentRepository.deleteAllById(studentIdsToDelete);
-            studentRepository.flush();
+            studentRepository.deleteByIdInBulk(studentIdsToDelete);
         }
 
         if (!recordsToUpdate.isEmpty()) {
             pointRecordRepository.saveAll(recordsToUpdate);
+            pointRecordRepository.flush();
         }
         if (!studentsToUpdate.isEmpty()) {
             studentRepository.saveAll(studentsToUpdate);
             studentRepository.flush();
         }
 
-        // 4. Re-sync dynamic risk analysis on remaining reports (if any remain)
+        // 4. Re-sync dynamic risk analysis on remaining reports (if any remain),
+        //    or guarantee zero orphan students & predictions when 0 PDFs remain
         Optional<PdfReport> latestRemaining = pdfReportRepository.findFirstByOrderByReportDateDescCreatedAtDesc();
         long remainingReportsCount = pdfReportRepository.count();
+        int totalDeletedStudents = studentIdsToDelete.size();
         if (latestRemaining.isPresent() && studentRepository.countByStatus("ACTIVE") > 0) {
             predictionService.analyzeAllActiveStudents(latestRemaining.get());
+        } else if (remainingReportsCount == 0) {
+            predictionRepository.deleteAllInBulk();
+            int extraOrphans = studentRepository.deleteAllStudentsInBulk();
+            totalDeletedStudents += extraOrphans;
         }
 
         auditLogService.log(
@@ -368,13 +487,13 @@ public class PdfReportService {
                 "PdfReport",
                 id,
                 deletedFileName,
-                "deletedStudents=" + studentIdsToDelete.size() + ", recalculatedStudents=" + studentsToUpdate.size(),
+                "deletedStudents=" + totalDeletedStudents + ", recalculatedStudents=" + studentsToUpdate.size(),
                 "Deleted PDF report archive and synchronized student records");
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("deletedReportId", id);
         result.put("deletedFileName", deletedFileName);
-        result.put("deletedStudentsCount", studentIdsToDelete.size());
+        result.put("deletedStudentsCount", totalDeletedStudents);
         result.put("recalculatedStudentsCount", studentsToUpdate.size());
         result.put("remainingReportsCount", remainingReportsCount);
         return result;
@@ -386,14 +505,25 @@ public class PdfReportService {
         List<Student> allStudents = studentRepository.findAll();
 
         List<Long> orphanIds = new ArrayList<>();
-        List<Student> studentsToRecalc = new ArrayList<>();
-        List<StudentPointRecord> recordsToUpdate = new ArrayList<>();
-
+        List<Student> studentsInPdf = new ArrayList<>();
         for (Student s : allStudents) {
             if (!studentIdsInAnyPdf.contains(s.getId())) {
                 orphanIds.add(s.getId());
             } else {
-                List<StudentPointRecord> hist = pointRecordRepository.findHistoryByStudentId(s.getId());
+                studentsInPdf.add(s);
+            }
+        }
+
+        Map<Long, List<StudentPointRecord>> historyByStudent = studentIdsInAnyPdf.isEmpty()
+                ? Map.of()
+                : pointRecordRepository.findHistoryByStudentIdIn(studentIdsInAnyPdf).stream()
+                        .collect(Collectors.groupingBy(r -> r.getStudent().getId()));
+
+        List<Student> studentsToRecalc = new ArrayList<>();
+        List<StudentPointRecord> recordsToUpdate = new ArrayList<>();
+        for (Student s : studentsInPdf) {
+            List<StudentPointRecord> hist = historyByStudent.getOrDefault(s.getId(), List.of());
+            if (!hist.isEmpty()) {
                 recalculateStudentFromHistory(s, hist, recordsToUpdate);
                 studentsToRecalc.add(s);
             }
@@ -401,12 +531,11 @@ public class PdfReportService {
 
         if (!orphanIds.isEmpty()) {
             predictionRepository.deleteByStudentIdIn(orphanIds);
-            predictionRepository.flush();
-            studentRepository.deleteAllById(orphanIds);
-            studentRepository.flush();
+            studentRepository.deleteByIdInBulk(orphanIds);
         }
         if (!recordsToUpdate.isEmpty()) {
             pointRecordRepository.saveAll(recordsToUpdate);
+            pointRecordRepository.flush();
         }
         if (!studentsToRecalc.isEmpty()) {
             studentRepository.saveAll(studentsToRecalc);
@@ -416,6 +545,8 @@ public class PdfReportService {
         Optional<PdfReport> latestRemaining = pdfReportRepository.findFirstByOrderByReportDateDescCreatedAtDesc();
         if (latestRemaining.isPresent() && !studentsToRecalc.isEmpty()) {
             predictionService.analyzeAllActiveStudents(latestRemaining.get());
+        } else if (latestRemaining.isEmpty()) {
+            predictionRepository.deleteAllInBulk();
         }
 
         auditLogService.log(

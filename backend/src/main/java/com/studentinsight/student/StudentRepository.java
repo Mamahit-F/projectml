@@ -3,16 +3,19 @@ package com.studentinsight.student;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface StudentRepository extends JpaRepository<Student, Long> {
     Optional<Student> findByNim(String nim);
+    List<Student> findByNimIn(Collection<String> nims);
     boolean existsByNim(String nim);
     List<Student> findByStatus(String status);
     List<Student> findByResidenceCategoryId(Long residenceCategoryId);
@@ -36,4 +39,12 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
                                  Pageable pageable);
 
     long countByStatus(String status);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM Student s WHERE s.id IN :ids")
+    void deleteByIdInBulk(@Param("ids") Collection<Long> ids);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM Student s")
+    int deleteAllStudentsInBulk();
 }

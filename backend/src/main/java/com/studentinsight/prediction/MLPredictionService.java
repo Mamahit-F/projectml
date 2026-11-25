@@ -12,14 +12,20 @@ import com.studentinsight.semester.SemesterSetting;
 import com.studentinsight.semester.SemesterSettingService;
 import com.studentinsight.student.Student;
 import com.studentinsight.student.StudentRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
+import java.sql.Types;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -38,6 +44,12 @@ public class MLPredictionService {
     private final AuditLogService auditLogService;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Autowired(required = false)
+    private JdbcTemplate jdbcTemplate;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Value("${app.ml.service-url:http://localhost:8001}")
     private String mlServiceUrl;
@@ -246,19 +258,115 @@ public class MLPredictionService {
             predictionsToSave.add(pred);
         }
 
-        studentRepository.saveAll(studentsToUpdate);
-        if (!recordsToUpdate.isEmpty()) {
-            pointRecordRepository.saveAll(recordsToUpdate);
+        Instant now = Instant.now();
+        List<StudentPredictionDTO> dtoList;
+        if (jdbcTemplate != null) {
+            if (!studentsToUpdate.isEmpty()) {
+                jdbcTemplate.batchUpdate(
+                        "UPDATE students SET risk_category = ?, projected_end_points = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        studentsToUpdate,
+                        200,
+                        (ps, s) -> {
+                            ps.setString(1, s.getRiskCategory());
+                            ps.setObject(2, s.getProjectedEndPoints(), Types.DOUBLE);
+                            ps.setLong(3, s.getId());
+                        }
+                );
+            }
+            if (!recordsToUpdate.isEmpty()) {
+                jdbcTemplate.batchUpdate(
+                        "UPDATE student_point_records SET risk_category = ?, projected_end_points = ?, percentile_rank = ? WHERE id = ?",
+                        recordsToUpdate,
+                        200,
+                        (ps, r) -> {
+                            ps.setString(1, r.getRiskCategory());
+                            ps.setObject(2, r.getProjectedEndPoints(), Types.DOUBLE);
+                            ps.setObject(3, r.getPercentileRank(), Types.DOUBLE);
+                            ps.setLong(4, r.getId());
+                        }
+                );
+            }
+            if (!predictionsToSave.isEmpty()) {
+                Long reportIdRef = reportRef != null ? reportRef.getId() : null;
+                jdbcTemplate.batchUpdate(
+                        "INSERT INTO ml_predictions (student_id, pdf_report_id, risk_category, prob_low, prob_medium, prob_high, " +
+                                "model_name, model_version, features_snapshot, projected_end_points, points_delta, current_points, " +
+                                "percentile_rank, analysis_mode, predicted_at) " +
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                        predictionsToSave,
+                        200,
+                        (ps, p) -> {
+                            ps.setLong(1, p.getStudent().getId());
+                            ps.setObject(2, reportIdRef, Types.BIGINT);
+                            ps.setString(3, p.getRiskCategory());
+                            ps.setDouble(4, p.getProbLow());
+                            ps.setDouble(5, p.getProbMedium());
+                            ps.setDouble(6, p.getProbHigh());
+                            ps.setString(7, p.getModelName());
+                            ps.setString(8, p.getModelVersion());
+                            ps.setString(9, p.getFeaturesSnapshot());
+                            ps.setObject(10, p.getProjectedEndPoints(), Types.DOUBLE);
+                            ps.setObject(11, p.getPointsDelta(), Types.INTEGER);
+                            ps.setObject(12, p.getCurrentPoints(), Types.INTEGER);
+                            ps.setObject(13, p.getPercentileRank(), Types.DOUBLE);
+                            ps.setString(14, p.getAnalysisMode());
+                        }
+                );
+            }
+
+            Set<Long> studentIdsWithContact = new HashSet<>(
+                    jdbcTemplate.queryForList("SELECT DISTINCT student_id FROM emergency_contacts", Long.class)
+            );
+            Integer finalLimit = setting.getFinalPointLimit();
+            dtoList = predictionsToSave.stream()
+                    .map(p -> {
+                        Student st = p.getStudent();
+                        int pts = p.getCurrentPoints() != null ? p.getCurrentPoints() : 0;
+                        return StudentPredictionDTO.builder()
+                                .studentId(st.getId())
+                                .studentNim(st.getNim())
+                                .studentName(st.getFullName())
+                                .studyProgram(st.getStudyProgram())
+                                .faculty(st.getFaculty())
+                                .residenceCategory(st.getResidenceCategory() != null ? st.getResidenceCategory().getName() : null)
+                                .currentPoints(pts)
+                                .pointsDelta(p.getPointsDelta() != null ? p.getPointsDelta() : 0)
+                                .projectedEndPoints(p.getProjectedEndPoints())
+                                .percentileRank(p.getPercentileRank() != null ? p.getPercentileRank() : 0.0)
+                                .riskCategory(p.getRiskCategory())
+                                .probLow(p.getProbLow())
+                                .probMedium(p.getProbMedium())
+                                .probHigh(p.getProbHigh())
+                                .modelName(p.getModelName())
+                                .modelVersion(p.getModelVersion())
+                                .analysisMode(p.getAnalysisMode())
+                                .exceedsFinalLimit(finalLimit != null && pts >= finalLimit)
+                                .hasEmergencyContact(studentIdsWithContact.contains(st.getId()))
+                                .predictedAt(now)
+                                .build();
+                    })
+                    .sorted(Comparator.comparingInt((StudentPredictionDTO d) -> d.getCurrentPoints() != null ? d.getCurrentPoints() : 0).reversed())
+                    .collect(Collectors.toList());
+
+            if (entityManager != null) {
+                entityManager.clear();
+            }
+        } else {
+            studentRepository.saveAll(studentsToUpdate);
+            if (!recordsToUpdate.isEmpty()) {
+                pointRecordRepository.saveAll(recordsToUpdate);
+            }
+            List<MLPrediction> saved = predictionRepository.saveAll(predictionsToSave);
+            dtoList = saved.stream()
+                    .map(p -> StudentPredictionDTO.fromEntity(p, setting.getFinalPointLimit()))
+                    .sorted(Comparator.comparingInt((StudentPredictionDTO d) -> d.getCurrentPoints() != null ? d.getCurrentPoints() : 0).reversed())
+                    .collect(Collectors.toList());
         }
-        List<MLPrediction> saved = predictionRepository.saveAll(predictionsToSave);
 
         auditLogService.log("ANALYZE_DYNAMIC_RISK", "MLPrediction", reportRef != null ? reportRef.getId() : null,
-                null, modelName, "Analyzed dynamic risk for " + saved.size() + " active students (" + analysisMode + ")");
+                null, modelName, "Analyzed dynamic risk for " + dtoList.size() + " active students (" + analysisMode + ")");
 
-        return saved.stream()
-                .map(p -> StudentPredictionDTO.fromEntity(p, setting.getFinalPointLimit()))
-                .sorted(Comparator.comparingInt((StudentPredictionDTO d) -> d.getCurrentPoints() != null ? d.getCurrentPoints() : 0).reversed())
-                .collect(Collectors.toList());
+        return dtoList;
     }
 
     @SuppressWarnings("unchecked")
