@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+!.env.example
+**/node_modules
+**/dist
+**/target
+**/.venv
+**/__pycache__
+**/*.pyc
+ml-service/artifacts
+**/*.log
+docs
